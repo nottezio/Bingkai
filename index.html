@@ -1,0 +1,2088 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#2A2A2A" />
+<link rel="icon" href="data:," />
+<title>Bingkai — Studio Foto</title>
+<!--
+  SCRL-style Photo Framing & Carousel PWA — single file, Android-first.
+  Build phase: P2 (app shell · import · two-resolution pipeline · EXIF orientation).
+  Code + comments: English. User-facing strings: Bahasa Indonesia (STRINGS).
+  Dependencies: none yet (JSZip arrives in P5; service worker in P6).
+-->
+<style>
+  /* ===== design tokens ===== */
+  :root {
+    --bg: #2A2A2A;          /* neutral mid-gray workspace backdrop */
+    --panel: #1C1C1C;       /* toolbar / chrome */
+    --panel-2: #242424;
+    --line: #383838;
+    --txt: #EDEDED;
+    --txt-dim: #9A9A9A;
+    --accent: #4A9EFF;
+    --accent-ink: #0B1F38;
+    --danger: #E5534B;
+    --toolbar-h: 64px;
+    --safe-b: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--txt);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none; touch-action: manipulation;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  /* ===== top bar ===== */
+  .topbar {
+    flex: 0 0 auto; height: 48px; display: flex; align-items: center;
+    gap: 10px; padding: 0 12px; background: var(--panel);
+    border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px);
+  }
+  .topbar .title { font-size: 15px; font-weight: 600; letter-spacing: .2px; }
+  .topbar .spacer { flex: 1; }
+  .icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--txt); cursor: pointer;
+  }
+  .icon-btn:active { background: #2e2e2e; }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  /* ===== workspace ===== */
+  .workspace {
+    position: relative; flex: 1 1 auto; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+    background:
+      radial-gradient(transparent 0, transparent 1px, rgba(255,255,255,.012) 1px) 0 0 / 22px 22px,
+      var(--bg);
+    overflow: hidden;
+  }
+  #stage { display: block; max-width: 100%; max-height: 100%; touch-action: none; }
+
+  /* empty state */
+  .empty {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; text-align: center;
+    padding: 24px; color: var(--txt-dim);
+  }
+  .empty.hidden { display: none; }
+  .empty .drop {
+    border: 1.5px dashed var(--line); border-radius: 16px; padding: 28px 22px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    max-width: 320px; background: rgba(255,255,255,.015);
+  }
+  .empty.drag { color: var(--accent); }
+  .empty.drag .drop { border-color: var(--accent); background: rgba(74,158,255,.06); }
+  .btn-primary {
+    background: var(--accent); color: var(--accent-ink); border: none;
+    font-weight: 700; font-size: 14px; padding: 11px 18px; border-radius: 12px; cursor: pointer;
+  }
+  .btn-primary:active { filter: brightness(.94); }
+  .hint { font-size: 12px; line-height: 1.5; }
+
+  /* busy spinner */
+  .busy { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    background:rgba(0,0,0,.35); z-index:5; }
+  .busy.show { display:flex; }
+  .spinner { width:34px; height:34px; border-radius:50%;
+    border:3px solid rgba(255,255,255,.25); border-top-color: var(--accent);
+    animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== filmstrip ===== */
+  .filmstrip {
+    flex: 0 0 auto; display: flex; gap: 8px; padding: 8px 10px; overflow-x: auto;
+    background: var(--panel); border-top: 1px solid var(--line); scrollbar-width: none;
+  }
+  .filmstrip::-webkit-scrollbar { display: none; }
+  .filmstrip.hidden { display: none; }
+  .thumb {
+    position: relative; flex: 0 0 auto; width: 52px; height: 52px; border-radius: 9px;
+    overflow: hidden; border: 2px solid transparent; background: #111; cursor: pointer;
+  }
+  .thumb.active { border-color: var(--accent); }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .x {
+    position: absolute; top: 1px; right: 1px; width: 17px; height: 17px; border-radius: 50%;
+    background: rgba(0,0,0,.62); color: #fff; font-size: 12px; line-height: 17px; text-align: center;
+  }
+  .thumb.add {
+    display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--line);
+    color: var(--txt-dim); font-size: 24px; background: var(--panel-2);
+  }
+
+  /* ===== bottom mode toolbar ===== */
+  .toolbar {
+    flex: 0 0 auto; height: calc(var(--toolbar-h) + var(--safe-b));
+    padding-bottom: var(--safe-b);
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    background: var(--panel); border-top: 1px solid var(--line);
+  }
+  .mode {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    color: var(--txt-dim); background: none; border: none; cursor: pointer; font-size: 11px;
+  }
+  .mode svg { width: 22px; height: 22px; }
+  .mode[aria-selected="true"] { color: var(--accent); }
+  .mode:disabled { opacity: .4; }
+
+  /* ===== control sheet (per-mode) ===== */
+  .sheet {
+    flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--line);
+    max-height: 46vh; overflow-y: auto; padding: 10px 12px 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .sheet.hidden { display: none; }
+  .row { margin: 9px 0; }
+  .row > .lab { font-size: 11px; color: var(--txt-dim); margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--txt);
+    font-size: 12.5px; padding: 7px 11px; border-radius: 9px; cursor: pointer; white-space: nowrap;
+  }
+  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: rgba(74,158,255,.08); }
+  input[type="range"] { width: 100%; accent-color: var(--accent); height: 26px; }
+  .swatches { display: flex; gap: 8px; align-items: center; }
+  .sw {
+    width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--line); cursor: pointer; padding: 0;
+  }
+  .sw[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,158,255,.25); }
+  .sw.custom { position: relative; overflow: hidden; background: conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+  .sw.custom input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { background: var(--panel-2); color: var(--txt); border: none; font-size: 12.5px; padding: 7px 13px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+  .export-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+  .export-row .btn-primary { flex: 1; padding: 13px; font-size: 15px; }
+  .note { font-size: 11px; color: var(--txt-dim); line-height: 1.45; margin-top: 8px; }
+  .note.warn { color: #E0B055; }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <span class="title" id="appTitle">Studio Foto</span>
+    <span class="spacer"></span>
+    <button class="icon-btn" id="btnInstall" style="display:none" aria-label="Pasang aplikasi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 4 5-4M5 21h14"/></svg>
+    </button>
+    <button class="icon-btn" id="btnAddTop" aria-label="Tambah foto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+
+  <div class="workspace" id="workspace">
+    <canvas id="stage"></canvas>
+
+    <div class="empty" id="empty">
+      <div class="drop" id="dropzone">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>
+        <div class="hint" id="emptyHint">Belum ada foto.<br>Impor JPEG hasil ekspor Lightroom.</div>
+        <button class="btn-primary" id="btnImport">Impor Foto</button>
+        <div class="hint" id="dropHint" style="opacity:.7">atau seret &amp; lepas ke sini</div>
+      </div>
+    </div>
+
+    <div class="busy" id="busy"><div class="spinner"></div></div>
+  </div>
+
+  <div class="filmstrip hidden" id="filmstrip"></div>
+
+  <div class="sheet hidden" id="sheetFrame">
+    <div class="row">
+      <div class="lab"><span id="labRatio">Rasio</span></div>
+      <div class="chips" id="ratioChips">
+        <button class="chip" data-ratio="1:1">1:1</button>
+        <button class="chip" data-ratio="4:5" aria-pressed="true">4:5</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="9:16">9:16</button>
+        <button class="chip" data-ratio="16:9">16:9</button>
+        <button class="chip" data-ratio="3:2">3:2</button>
+        <button class="chip" data-ratio="original" id="chipOriginal">Asli</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labMargin">Margin</span><span id="marginVal">4%</span></div>
+      <input type="range" id="marginRange" min="0" max="25" step="1" value="4" />
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labBg">Latar belakang</span></div>
+      <div class="seg" id="bgSeg">
+        <button data-bg="solid" aria-pressed="true" id="bgSolid">Warna</button>
+        <button data-bg="blur" id="bgBlur">Blur</button>
+      </div>
+    </div>
+
+    <div class="row" id="blurRow" style="display:none">
+      <div class="lab"><span id="labBlur">Kekuatan blur</span><span id="blurVal">5%</span></div>
+      <input type="range" id="blurRange" min="2" max="14" step="1" value="5" />
+    </div>
+
+    <div class="row" id="frameColorRow">
+      <div class="lab"><span id="labFrameColor">Warna bingkai</span></div>
+      <div class="swatches" id="frameSwatches">
+        <button class="sw" data-color="#FFFFFF" style="background:#fff" aria-pressed="true"></button>
+        <button class="sw" data-color="#000000" style="background:#000"></button>
+        <button class="sw" data-color="#F2EDE4" style="background:#F2EDE4"></button>
+        <button class="sw custom" id="customSw"><input type="color" id="customColor" value="#cccccc" /></button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labExportSize">Ukuran ekspor</span></div>
+      <div class="seg" id="sizeSeg">
+        <button data-ig="1" aria-pressed="true" id="sizeIG">Instagram 1080</button>
+        <button data-ig="0" id="sizeHi">Resolusi tinggi</button>
+      </div>
+    </div>
+
+    <div class="row" id="qualityRow">
+      <div class="lab"><span id="labQuality">Kualitas JPEG</span><span id="qualityVal">92</span></div>
+      <input type="range" id="qualityRange" min="70" max="95" step="1" value="92" />
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labFormat">Format</span></div>
+      <div class="seg" id="formatSeg">
+        <button data-fmt="jpeg" aria-pressed="true" id="fmtJpeg">JPEG (foto)</button>
+        <button data-fmt="png" id="fmtPng">PNG (desain)</button>
+      </div>
+    </div>
+
+    <div class="export-row">
+      <button class="btn-primary" id="btnExport">Ekspor</button>
+    </div>
+    <div class="note" id="exportNote"></div>
+
+    <div class="row" id="presetsRow" style="margin-top:14px">
+      <div class="lab"><span id="labPresets">Preset</span><button class="chip" id="btnSavePreset" style="padding:5px 11px">+ Simpan</button></div>
+      <div class="chips" id="presetChips"></div>
+    </div>
+  </div>
+
+  <div class="sheet hidden" id="sheetCrop">
+    <div class="row">
+      <div class="lab"><span id="labCropRatio">Rasio</span><span id="cropHint" style="opacity:.7"></span></div>
+      <div class="chips" id="cropRatioChips">
+        <button class="chip" data-ratio="1:1">1:1</button>
+        <button class="chip" data-ratio="4:5" aria-pressed="true">4:5</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="9:16">9:16</button>
+        <button class="chip" data-ratio="16:9">16:9</button>
+        <button class="chip" data-ratio="3:2">3:2</button>
+        <button class="chip" data-ratio="original" id="cropChipOriginal">Asli</button>
+      </div>
+    </div>
+    <div class="export-row">
+      <button class="chip" id="btnCropReset" style="padding:13px 16px">Atur ulang</button>
+      <button class="btn-primary" id="btnCropExport">Ekspor</button>
+    </div>
+    <div class="note" id="cropExportNote"></div>
+  </div>
+
+  <div class="sheet hidden" id="sheetCollage">
+    <div class="row">
+      <div class="lab"><span id="labGrid">Kisi</span></div>
+      <div class="chips" id="gridChips">
+        <button class="chip" data-rows="1" data-cols="2">1×2</button>
+        <button class="chip" data-rows="2" data-cols="1">2×1</button>
+        <button class="chip" data-rows="2" data-cols="2" aria-pressed="true">2×2</button>
+        <button class="chip" data-rows="1" data-cols="3">1×3</button>
+        <button class="chip" data-rows="3" data-cols="1">3×1</button>
+        <button class="chip" data-rows="2" data-cols="3">2×3</button>
+        <button class="chip" data-rows="3" data-cols="2">3×2</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labColRatio">Rasio</span></div>
+      <div class="chips" id="collageRatioChips">
+        <button class="chip" data-ratio="1:1" aria-pressed="true">1:1</button>
+        <button class="chip" data-ratio="4:5">4:5</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="16:9">16:9</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labGutter">Jarak</span><span id="gutterVal">2%</span></div>
+      <input type="range" id="gutterRange" min="0" max="10" step="1" value="2" />
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labColMargin">Margin luar</span><span id="colMarginVal">0%</span></div>
+      <input type="range" id="colMarginRange" min="0" max="10" step="1" value="0" />
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labGutterColor">Warna jarak</span></div>
+      <div class="swatches" id="gutterSwatches">
+        <button class="sw" data-color="#FFFFFF" style="background:#fff" aria-pressed="true"></button>
+        <button class="sw" data-color="#000000" style="background:#000"></button>
+        <button class="sw" data-color="#F2EDE4" style="background:#F2EDE4"></button>
+        <button class="sw custom" id="gutterCustomSw"><input type="color" id="gutterCustomColor" value="#cccccc" /></button>
+      </div>
+    </div>
+    <div class="note" id="collageHint"></div>
+    <div class="export-row">
+      <button class="btn-primary" id="btnCollageExport">Ekspor</button>
+    </div>
+  </div>
+
+  <div class="sheet hidden" id="sheetCarousel">
+    <div class="row">
+      <div class="lab"><span id="labTiles">Jumlah tile</span><span id="tilesVal">3</span></div>
+      <div class="seg" id="tilesStepper">
+        <button id="tilesMinus" style="font-size:18px;padding:6px 16px">\u2212</button>
+        <button id="tilesPlus" style="font-size:18px;padding:6px 16px">+</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labTileRatio">Rasio tile</span></div>
+      <div class="chips" id="tileRatioChips">
+        <button class="chip" data-ratio="4:5" aria-pressed="true">4:5</button>
+        <button class="chip" data-ratio="1:1">1:1</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="9:16">9:16</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labFill">Pengisian</span></div>
+      <div class="seg" id="fillSeg">
+        <button data-fill="cover" aria-pressed="true" id="fillCover">Penuh</button>
+        <button data-fill="fit" id="fillFit">Muat</button>
+      </div>
+    </div>
+    <div class="note" id="carouselHint"></div>
+    <div class="export-row">
+      <button class="btn-primary" id="btnCarouselExport">Ekspor</button>
+    </div>
+    <div class="note" id="carouselNote"></div>
+  </div>
+
+  <div class="toolbar" id="toolbar">
+    <button class="mode" data-mode="frame" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      <span id="lblFrame">Bingkai</span>
+    </button>
+    <button class="mode" data-mode="crop" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      <span id="lblCrop">Potong</span>
+    </button>
+    <button class="mode" data-mode="collage" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+      <span id="lblCollage">Kolase</span>
+    </button>
+    <button class="mode" data-mode="carousel" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="16" rx="1.5"/><path d="M3.5 8v8M20.5 8v8"/></svg>
+      <span id="lblCarousel">Carousel</span>
+    </button>
+  </div>
+</div>
+
+<input id="filePicker" class="sr-only" type="file" accept="image/*" multiple />
+
+<script>
+"use strict";
+
+/* ===========================================================================
+ * STRINGS — single source of all Bahasa Indonesia UI copy.
+ * ======================================================================== */
+const STRINGS = {
+  appTitle: "Studio Foto",
+  modes: { frame: "Bingkai", crop: "Potong", collage: "Kolase", carousel: "Carousel" },
+  emptyTitle: "Belum ada foto.",
+  emptySub: "Impor JPEG hasil ekspor Lightroom.",
+  import: "Impor Foto",
+  dropHint: "atau seret & lepas ke sini",
+  addPhoto: "Tambah foto",
+  loading: "Memuat\u2026",
+  errDecode: "Gagal membaca gambar: ",
+  errNoImages: "Tidak ada berkas gambar yang valid.",
+  removeConfirm: "Hapus foto ini dari sesi?",
+  modeSoon: "Mode ini aktif pada fase berikutnya.",
+  ratio: "Rasio", original: "Asli",
+  margin: "Margin", background: "Latar belakang", bgSolid: "Warna", bgBlur: "Blur",
+  frameColor: "Warna bingkai",
+  exportSize: "Ukuran ekspor", sizeIG: "Instagram 1080", sizeHi: "Resolusi tinggi",
+  quality: "Kualitas JPEG", format: "Format", fmtJpeg: "JPEG (foto)", fmtPng: "PNG (desain)",
+  exportBtn: "Ekspor", exporting: "Mengekspor\u2026",
+  igNote: "1080px sRGB \u2014 lebar native Instagram. Tidak ada penskalaan ulang di sisi IG.",
+  hiNote: "Sisi pendek hingga 2160px. IG akan menurunkan ke 1080 saat diunggah.",
+  pngNote: "PNG cocok untuk teks/grafik datar, bukan foto. Berkas jauh lebih besar; IG tetap mengubahnya jadi JPEG.",
+  upscaleWarn: "Sumber lebih kecil dari 1080px \u2014 hasil akan di-upscale dan terlihat lembut.",
+  shared: "Dibagikan lewat lembar berbagi.",
+  downloaded: "Tersimpan ke folder Unduhan (bukan langsung ke Galeri).",
+  exportFail: "Ekspor gagal. Coba kurangi ukuran atau kualitas.",
+  free: "Bebas", reset: "Atur ulang",
+  cropHint: "Seret untuk geser \u00b7 cubit untuk zoom",
+  cropExportNote: "Memakai profil ekspor: Instagram 1080 \u00b7 JPEG q92. Ubah di tab Bingkai.",
+  grid: "Kisi", gutter: "Jarak", outerMargin: "Margin luar", gutterColor: "Warna jarak",
+  collageHint: "Ketuk untuk pilih \u00b7 seret untuk geser \u00b7 seret ke sel lain untuk tukar",
+  needTwoForCollage: "Tambah lebih banyak foto untuk mengisi sel.",
+  tiles: "Jumlah tile", tileRatio: "Rasio tile", fill: "Pengisian",
+  fillCover: "Penuh (cover)", fillFit: "Muat (fit)",
+  carouselHint: "Geser untuk pratinjau tiap tile \u00b7 tepi konten menyambung",
+  carouselNote: "Mengekspor N gambar 1080px (seamless_01..) dalam urutan unggah. Tepi tiap tile sama persis 1080px agar IG tidak menggeser jahitan.",
+  sharedN: "Dibagikan lewat lembar berbagi.",
+  zipped: "ZIP tersimpan ke Unduhan.",
+  downloadedN: "tiap tile diunduh terpisah (lembar berbagi tidak tersedia).",
+  presets: "Preset", savePreset: "+ Simpan", promptName: "Nama preset:",
+  presetSaved: "Preset disimpan.", deletePreset: "Hapus preset ini?",
+  blurStrength: "Kekuatan blur", install: "Pasang aplikasi",
+};
+
+/* ===========================================================================
+ * geometryCore — INLINED VERBATIM from the P1-tested module.
+ * Function bodies are byte-identical to geometryCore.js (Node-verified).
+ * Only the export mechanism differs (object literal vs module.exports).
+ * DO NOT edit math here without re-running geometryCore.test.js.
+ * ======================================================================== */
+const geometryCore = (function () {
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  function splitInteger(total, n) {
+    if (!Number.isInteger(total)) throw new RangeError('splitInteger: total must be integer');
+    if (n <= 0) throw new RangeError('splitInteger: n must be > 0');
+    const base = Math.floor(total / n);
+    const rem = total - base * n;
+    const parts = new Array(n);
+    for (let i = 0; i < n; i++) parts[i] = base + (i < rem ? 1 : 0);
+    return parts;
+  }
+
+  const RATIO_PRESETS = {
+    '1:1': [1, 1], '4:5': [4, 5], '3:4': [3, 4],
+    '9:16': [9, 16], '16:9': [16, 9], '3:2': [3, 2],
+  };
+
+  function parseRatio(preset, sourceW, sourceH) {
+    if (preset === 'original') {
+      if (!(sourceW > 0 && sourceH > 0)) throw new RangeError('parseRatio: "original" needs positive source dims');
+      return { w: sourceW, h: sourceH };
+    }
+    const p = RATIO_PRESETS[preset];
+    if (!p) throw new RangeError('parseRatio: unknown preset "' + preset + '"');
+    return { w: p[0], h: p[1] };
+  }
+
+  function canvasDimsForRatio(ratioW, ratioH, exportShortEdge) {
+    if (ratioW <= 0 || ratioH <= 0) throw new RangeError('canvasDimsForRatio: bad ratio');
+    if (exportShortEdge <= 0) throw new RangeError('canvasDimsForRatio: bad short edge');
+    let Cw, Ch;
+    if (ratioW <= ratioH) { Cw = exportShortEdge; Ch = Math.round(exportShortEdge * (ratioH / ratioW)); }
+    else { Ch = exportShortEdge; Cw = Math.round(exportShortEdge * (ratioW / ratioH)); }
+    return { Cw, Ch };
+  }
+
+  function computeContainRect(sw, sh, dw, dh) {
+    const scale = Math.min(dw / sw, dh / sh);
+    const w = sw * scale, h = sh * scale;
+    return { x: (dw - w) / 2, y: (dh - h) / 2, w, h, scale };
+  }
+  function computeCoverRect(sw, sh, dw, dh) {
+    const scale = Math.max(dw / sw, dh / sh);
+    const w = sw * scale, h = sh * scale;
+    return { x: (dw - w) / 2, y: (dh - h) / 2, w, h, scale };
+  }
+  function computeFillRect(sw, sh, dw, dh, mode) {
+    return mode === 'cover' ? computeCoverRect(sw, sh, dw, dh) : computeContainRect(sw, sh, dw, dh);
+  }
+
+  function computeFrameLayout({ sw, sh, Cw, Ch, marginPct }) {
+    if (sw <= 0 || sh <= 0 || Cw <= 0 || Ch <= 0) throw new RangeError('computeFrameLayout: dims must be > 0');
+    if (marginPct < 0 || marginPct > 25) throw new RangeError('computeFrameLayout: marginPct out of [0,25]');
+    const marginPx = (marginPct / 100) * Math.min(Cw, Ch);
+    const inner = { x: marginPx, y: marginPx, w: Cw - 2 * marginPx, h: Ch - 2 * marginPx };
+    const fit = computeContainRect(sw, sh, inner.w, inner.h);
+    const draw = { x: inner.x + fit.x, y: inner.y + fit.y, w: fit.w, h: fit.h, scale: fit.scale };
+    const frame = { top: draw.y, bottom: Ch - (draw.y + draw.h), left: draw.x, right: Cw - (draw.x + draw.w) };
+    return { marginPx, inner, draw, frame };
+  }
+
+  function maxAspectBox(sw, sh, rw, rh) {
+    const r = rw / rh;
+    if (sw / sh > r) return { w: sh * r, h: sh };
+    return { w: sw, h: sw / r };
+  }
+  function clampCropBox(box, sw, sh) {
+    const w = clamp(box.w, 1, sw), h = clamp(box.h, 1, sh);
+    const x = clamp(box.x, 0, sw - w), y = clamp(box.y, 0, sh - h);
+    return { x, y, w, h };
+  }
+  function computeCropBoxLocked({ sourceW, sourceH, ratioW, ratioH, zoom, centerX, centerY }) {
+    if (sourceW <= 0 || sourceH <= 0) throw new RangeError('crop: source dims > 0');
+    const max = maxAspectBox(sourceW, sourceH, ratioW, ratioH);
+    const z = Math.max(1, zoom);
+    const w = max.w / z, h = max.h / z;
+    const cx = clamp(centerX, w / 2, sourceW - w / 2);
+    const cy = clamp(centerY, h / 2, sourceH - h / 2);
+    return { x: cx - w / 2, y: cy - h / 2, w, h };
+  }
+  function cropZoomAboutPoint({ sourceW, sourceH, ratioW, ratioH, zoom, centerX, centerY, factor, fx, fy, maxZoom = 64 }) {
+    const max = maxAspectBox(sourceW, sourceH, ratioW, ratioH);
+    const oldZ = Math.max(1, zoom);
+    const oldW = max.w / oldZ, oldH = max.h / oldZ;
+    const oldX = clamp(centerX, oldW / 2, sourceW - oldW / 2) - oldW / 2;
+    const oldY = clamp(centerY, oldH / 2, sourceH - oldH / 2) - oldH / 2;
+    const srcX = oldX + fx * oldW, srcY = oldY + fy * oldH;
+    const newZ = clamp(oldZ * factor, 1, maxZoom);
+    const newW = max.w / newZ, newH = max.h / newZ;
+    let ncx = srcX + newW * (0.5 - fx), ncy = srcY + newH * (0.5 - fy);
+    ncx = clamp(ncx, newW / 2, sourceW - newW / 2);
+    ncy = clamp(ncy, newH / 2, sourceH - newH / 2);
+    return { zoom: newZ, centerX: ncx, centerY: ncy };
+  }
+
+  function computeCarouselComposite({ Hc, N, tileRatioW, tileRatioH }) {
+    if (Hc <= 0) throw new RangeError('carousel: Hc must be > 0');
+    if (!(Number.isInteger(N) && N >= 2 && N <= 10)) throw new RangeError('carousel: N must be an integer in 2..10');
+    const tileWNominal = Hc * (tileRatioW / tileRatioH);
+    const Wc = Math.round(N * tileWNominal);
+    if (Wc < N) throw new RangeError('carousel: Wc < N (degenerate composite)');
+    return { Wc, Hc, tileWNominal };
+  }
+  function computeCarouselBoundaries(Wc, N) {
+    if (!(Number.isInteger(Wc) && Wc >= N)) throw new RangeError('carousel: need integer Wc >= N');
+    const b = new Array(N + 1);
+    for (let k = 0; k <= N; k++) b[k] = Math.round((k * Wc) / N);
+    return b;
+  }
+  function carouselTiles(Wc, Hc, N) {
+    const b = computeCarouselBoundaries(Wc, N);
+    const tiles = new Array(N);
+    for (let k = 0; k < N; k++) tiles[k] = { index: k, x: b[k], y: 0, w: b[k + 1] - b[k], h: Hc };
+    return tiles;
+  }
+  function carouselFilenames(N, prefix = 'seamless', ext = 'jpg') {
+    const out = new Array(N);
+    for (let k = 1; k <= N; k++) out[k - 1] = `${prefix}_${String(k).padStart(2, '0')}.${ext}`;
+    return out;
+  }
+
+  function computeCollageLayout({ Cw, Ch, rows, cols, outerMargin = 0, gutter = 0 }) {
+    if (!(Number.isInteger(rows) && rows > 0)) throw new RangeError('collage: rows > 0 int');
+    if (!(Number.isInteger(cols) && cols > 0)) throw new RangeError('collage: cols > 0 int');
+    const M = outerMargin, G = gutter;
+    const aw = Cw - 2 * M, ah = Ch - 2 * M;
+    const colTotal = aw - (cols - 1) * G, rowTotal = ah - (rows - 1) * G;
+    if (colTotal < cols || rowTotal < rows) throw new RangeError('collage: not enough space for cells (>=1px each)');
+    const colW = splitInteger(colTotal, cols), rowH = splitInteger(rowTotal, rows);
+    const lefts = new Array(cols); let x = M;
+    for (let c = 0; c < cols; c++) { lefts[c] = x; x += colW[c] + G; }
+    const tops = new Array(rows); let y = M;
+    for (let r = 0; r < rows; r++) { tops[r] = y; y += rowH[r] + G; }
+    const cells = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) cells.push({ r, c, x: lefts[c], y: tops[r], w: colW[c], h: rowH[r] });
+    return { cells, colW, rowH, outerMargin: M, gutter: G };
+  }
+
+  return {
+    clamp, splitInteger, RATIO_PRESETS, parseRatio, canvasDimsForRatio,
+    computeContainRect, computeCoverRect, computeFillRect, computeFrameLayout,
+    maxAspectBox, clampCropBox, computeCropBoxLocked, cropZoomAboutPoint,
+    computeCarouselComposite, computeCarouselBoundaries, carouselTiles, carouselFilenames,
+    computeCollageLayout,
+  };
+})();
+
+/* ===========================================================================
+ * Config
+ * ======================================================================== */
+const CONFIG = {
+  WORK_MAX: 2048,     // long-edge cap for the working (preview) bitmap
+  EXPORT_MAX: 2160,   // short-edge cap for high-res (non-IG) export
+  IG_WIDTH: 1080,     // Instagram feed render width — pin to this for zero IG resize
+  DPR_CAP: 2.5,       // limit devicePixelRatio to bound stage canvas memory
+};
+
+/* ===========================================================================
+ * State — one full-res ImageBitmap per source, at most one working bitmap shown.
+ * ======================================================================== */
+const state = {
+  sources: [],        // { id, name, bitmap(full-res), w, h, thumbUrl }
+  activeId: null,
+  mode: "frame",
+  work: null,         // { id, bitmap(downscaled), w, h } — current preview bitmap
+  frame: {
+    ratio: "4:5",
+    marginPct: 4,
+    frameColor: "#FFFFFF",
+    bg: "solid",        // 'solid' | 'blur'
+    blurStrength: 0.05, // fraction of min(Cw,Ch) used as blur radius
+  },
+  exportOpt: {
+    ig: true,           // pin width to IG 1080
+    quality: 0.92,      // JPEG quality
+    format: "jpeg",     // 'jpeg' | 'png'
+  },
+  crop: {
+    ratio: "4:5",       // preset key or 'free'
+    zoom: 1,            // >=1
+    cx: 0.5, cy: 0.5,   // crop centre as fraction of source (resolution-independent)
+  },
+  collage: {
+    rows: 2, cols: 2,
+    ratio: "1:1",        // output canvas ratio
+    gutterPct: 2,        // % of min(canvas edge)
+    marginPct: 0,        // outer margin, % of min(canvas edge)
+    gutterColor: "#FFFFFF",
+    cells: [],           // [{ srcId, zoom, cx, cy }] length rows*cols
+    selected: 0,
+  },
+  carousel: {
+    n: 3,                // number of tiles (2..10)
+    tileRatio: "4:5",    // each posted tile's aspect
+    fill: "cover",       // 'cover' | 'fit'
+    pos: 0,              // preview scroll position in tile units
+  },
+};
+let _idSeq = 0;
+const nextId = () => "src_" + (++_idSeq);
+
+/* ===========================================================================
+ * importer — decode with EXIF orientation baked in, build two-res assets.
+ * ======================================================================== */
+const importer = (function () {
+
+  // Decode a File/Blob into an orientation-corrected ImageBitmap.
+  // `imageOrientation:'from-image'` makes the decoder apply the EXIF transform,
+  // so intrinsic w/h are the *visual* dimensions — no manual EXIF parsing.
+  async function decodeOriented(blob) {
+    try {
+      return await createImageBitmap(blob, { imageOrientation: "from-image" });
+    } catch (e) {
+      // Fallback path: some engines reject the options bag. Decode raw, then
+      // the rotation may be wrong — acceptable degraded mode, flagged to user.
+      return await createImageBitmap(blob);
+    }
+  }
+
+  // Downscale a full-res bitmap to <= WORK_MAX on its long edge for the preview
+  // pipeline. Returns a NEW ImageBitmap; caller owns its lifecycle.
+  async function makeWorkingBitmap(srcBitmap, w, h) {
+    const long = Math.max(w, h);
+    if (long <= CONFIG.WORK_MAX) {
+      // Already small enough — clone so working/source lifecycles stay separate.
+      return await createImageBitmap(srcBitmap);
+    }
+    const scale = CONFIG.WORK_MAX / long;
+    const dw = Math.max(1, Math.round(w * scale));
+    const dh = Math.max(1, Math.round(h * scale));
+    const off = new OffscreenCanvas(dw, dh);
+    const ctx = off.getContext("2d");
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(srcBitmap, 0, 0, dw, dh);
+    return await createImageBitmap(off);
+  }
+
+  // Small JPEG thumbnail (object URL) for the filmstrip. Cheap, cover-cropped.
+  async function makeThumbUrl(srcBitmap, w, h, size = 104) {
+    const fit = geometryCore.computeCoverRect(w, h, size, size);
+    const off = new OffscreenCanvas(size, size);
+    const ctx = off.getContext("2d");
+    ctx.drawImage(srcBitmap, fit.x, fit.y, fit.w, fit.h);
+    const blob = await off.convertToBlob({ type: "image/jpeg", quality: 0.7 });
+    return URL.createObjectURL(blob);
+  }
+
+  // Import a list of File objects → push sources, return how many succeeded.
+  async function importFiles(fileList) {
+    const files = Array.from(fileList).filter((f) => /^image\//.test(f.type));
+    if (!files.length) { ui.toast(STRINGS.errNoImages); return 0; }
+    ui.setBusy(true);
+    let ok = 0;
+    try {
+      for (const f of files) {
+        try {
+          const bitmap = await decodeOriented(f);
+          const w = bitmap.width, h = bitmap.height; // already orientation-corrected
+          const thumbUrl = await makeThumbUrl(bitmap, w, h);
+          const id = nextId();
+          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl });
+          if (!state.activeId) state.activeId = id;
+          ok++;
+        } catch (e) {
+          console.error("decode failed", f && f.name, e);
+          ui.toast(STRINGS.errDecode + (f && f.name ? f.name : ""));
+        }
+      }
+    } finally {
+      ui.setBusy(false);
+    }
+    if (ok) { await renderer.useActive(); ui.refreshFilmstrip(); ui.refreshEmpty(); ui.updateExportNote(); }
+    return ok;
+  }
+
+  // Release everything tied to a source (GPU bitmap + object URL).
+  function disposeSource(src) {
+    try { src.bitmap && src.bitmap.close && src.bitmap.close(); } catch (_) {}
+    try { src.thumbUrl && URL.revokeObjectURL(src.thumbUrl); } catch (_) {}
+  }
+
+  return { importFiles, makeWorkingBitmap, disposeSource };
+})();
+
+/* ===========================================================================
+ * compositor — resolution-agnostic frame composition. Draws into ANY ctx in a
+ * 0..Cw × 0..Ch coordinate space, using ANY bitmap (working OR full-res). The
+ * exact same path renders the live preview and the full-res export, so WYSIWYG
+ * is structural, not approximated. Layout comes from the P1-tested geometryCore.
+ * ======================================================================== */
+const compositor = (function () {
+  // Cover-draw a bitmap over Cw×Ch, centered, with optional overscan (>1).
+  function coverDraw(ctx, bmp, bw, bh, Cw, Ch, overscan) {
+    const s = Math.max(Cw / bw, Ch / bh) * (overscan || 1);
+    const dw = bw * s, dh = bh * s;
+    ctx.drawImage(bmp, (Cw - dw) / 2, (Ch - dh) / 2, dw, dh);
+  }
+
+  // Returns the geometryCore layout it used (so callers/tests can verify).
+  function composeFrame(ctx, bmp, bw, bh, Cw, Ch, f) {
+    if (f.bg === "blur") {
+      const r = Math.max(1, Math.round(Math.min(Cw, Ch) * (f.blurStrength || 0.05)));
+      ctx.save();
+      ctx.filter = "blur(" + r + "px)";
+      coverDraw(ctx, bmp, bw, bh, Cw, Ch, 1.12); // overscan hides blur bleed at edges
+      ctx.restore();
+    } else {
+      ctx.fillStyle = f.frameColor;
+      ctx.fillRect(0, 0, Cw, Ch);
+    }
+    const L = geometryCore.computeFrameLayout({ sw: bw, sh: bh, Cw, Ch, marginPct: f.marginPct });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bmp, L.draw.x, L.draw.y, L.draw.w, L.draw.h);
+    return L;
+  }
+
+  // Target canvas pixel dims for a ratio under the current export profile.
+  function exportDims(ratioW, ratioH, ig) {
+    if (ig) {
+      const Cw = CONFIG.IG_WIDTH;
+      const Ch = Math.round(Cw * (ratioH / ratioW));
+      return { Cw, Ch };
+    }
+    return geometryCore.canvasDimsForRatio(ratioW, ratioH, CONFIG.EXPORT_MAX);
+  }
+
+  return { composeFrame, coverDraw, exportDims };
+})();
+
+
+/* ===========================================================================
+ * renderer — two-resolution preview. Draws the active image on the
+ * gray stage at working resolution. Frame composition is delegated to the
+ * compositor; later phases add crop/collage/carousel rendering.
+ * ======================================================================== */
+const renderer = (function () {
+  const stage = document.getElementById("stage");
+  const ctx = stage.getContext("2d");
+
+  function activeSource() {
+    return state.sources.find((s) => s.id === state.activeId) || null;
+  }
+
+  // Swap the working bitmap to match the active source. Closes the previous one
+  // so only a single downscaled bitmap is resident at a time (memory discipline).
+  async function useActive() {
+    const src = activeSource();
+    if (!src) { clear(); return; }
+    if (state.work && state.work.id === src.id) { draw(); return; }
+    const prev = state.work;
+    const bmp = await importer.makeWorkingBitmap(src.bitmap, src.w, src.h);
+    state.work = { id: src.id, bitmap: bmp, w: bmp.width, h: bmp.height };
+    if (prev && prev.bitmap && prev.bitmap.close) { try { prev.bitmap.close(); } catch (_) {} }
+    draw();
+  }
+
+  function clear() {
+    const ws = document.getElementById("workspace");
+    sizeStage(ws.clientWidth, ws.clientHeight);
+    ctx.clearRect(0, 0, stage.width, stage.height);
+  }
+
+  // Size the backing store to the workspace box × capped DPR; CSS keeps layout px.
+  function sizeStage(cssW, cssH) {
+    const dpr = Math.min(window.devicePixelRatio || 1, CONFIG.DPR_CAP);
+    stage.style.width = cssW + "px";
+    stage.style.height = cssH + "px";
+    stage.width = Math.max(1, Math.round(cssW * dpr));
+    stage.height = Math.max(1, Math.round(cssH * dpr));
+    return dpr;
+  }
+
+  // Mode-aware preview. Frame mode: render the actual output rectangle (at the
+  // selected ratio) letterboxed on the gray stage, composed by `compositor`.
+  function draw() {
+    const work = state.work;
+    const ws = document.getElementById("workspace");
+    if (!work) { clear(); return; }
+    const src = activeSource();
+    const dpr = sizeStage(ws.clientWidth, ws.clientHeight);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, ws.clientWidth, ws.clientHeight);
+
+    if (state.mode === "frame" && src) {
+      const f = state.frame;
+      const r = geometryCore.parseRatio(f.ratio, src.w, src.h);
+      // Preview shape uses a stable nominal size; only the ratio matters here.
+      const shape = geometryCore.canvasDimsForRatio(r.w, r.h, 1200);
+      const fit = geometryCore.computeContainRect(shape.Cw, shape.Ch, ws.clientWidth, ws.clientHeight);
+      ctx.save();
+      ctx.translate(fit.x, fit.y);
+      ctx.scale(fit.scale, fit.scale);
+      compositor.composeFrame(ctx, work.bitmap, work.w, work.h, shape.Cw, shape.Ch, f);
+      ctx.restore();
+      ctx.strokeStyle = "rgba(0,0,0,.28)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(fit.x + 0.5, fit.y + 0.5, fit.w - 1, fit.h - 1);
+      return;
+    }
+
+    if (state.mode === "crop" && src) {
+      cropMode.drawPreview(ctx, ws.clientWidth, ws.clientHeight);
+      return;
+    }
+
+    if (state.mode === "collage" && src) {
+      collageMode.drawPreview(ctx, ws.clientWidth, ws.clientHeight);
+      return;
+    }
+
+    if (state.mode === "carousel" && src) {
+      carouselMode.drawPreview(ctx, ws.clientWidth, ws.clientHeight);
+      return;
+    }
+
+    // Fallback (other modes, pre-integration): plain contain preview.
+    const fit = geometryCore.computeContainRect(work.w, work.h, ws.clientWidth, ws.clientHeight);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(work.bitmap, fit.x, fit.y, fit.w, fit.h);
+  }
+
+  return { useActive, draw, clear, activeSource, sizeStage };
+})();
+
+/* ===========================================================================
+ * exporter — full-resolution render ON DEMAND, then release. Uses the full-res
+ * source bitmap (not the preview bitmap) so output is the real resolution. The
+ * export canvas defaults to sRGB → P3/AdobeRGB sources are normalized to sRGB,
+ * which is exactly what Instagram expects.
+ * ======================================================================== */
+const exporter = (function () {
+
+  function tsName(ratio, ext) {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    const stamp = "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+    return "bingkai_" + ratio.replace(":", "x") + "_" + stamp + "." + ext;
+  }
+
+  function canvasToBlob(canvas, type, quality) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob null"))), type, quality);
+    });
+  }
+
+  function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  async function deliver(blob, filename) {
+    const file = new File([blob], filename, { type: blob.type });
+    // Prefer the native share sheet on Android (lets user pick IG directly).
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); ui.toast(STRINGS.shared); return; }
+      catch (e) { if (e && e.name === "AbortError") return; /* fall through to download */ }
+    }
+    triggerDownload(blob, filename);
+    ui.toast(STRINGS.downloaded);
+  }
+
+  // JSZip (the one CDN dependency) is loaded lazily on first carousel export so
+  // it never blocks startup and never errors when offline. The P6 service worker
+  // will precache this exact URL so it works offline after one online use.
+  let _zipPromise = null;
+  function ensureJSZip() {
+    if (typeof JSZip !== "undefined") return Promise.resolve(true);
+    if (_zipPromise) return _zipPromise;
+    _zipPromise = new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js";
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+    return _zipPromise;
+  }
+
+  // Multi-file delivery for carousel: share files[] → ZIP (JSZip) → per-file.
+  async function deliverMany(files) {
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files }); ui.toast(STRINGS.sharedN); return; }
+      catch (e) { if (e && e.name === "AbortError") return; }
+    }
+    await ensureJSZip();
+    if (typeof JSZip !== "undefined") {
+      const zip = new JSZip();
+      files.forEach((f) => zip.file(f.name, f));
+      const blob = await zip.generateAsync({ type: "blob" });
+      triggerDownload(blob, "carousel_" + files.length + "tile.zip");
+      ui.toast(STRINGS.zipped);
+      return;
+    }
+    for (const f of files) { triggerDownload(f, f.name); await new Promise((r) => setTimeout(r, 300)); }
+    ui.toast(files.length + " " + STRINGS.downloadedN);
+  }
+
+  // Render the active source at full export resolution and deliver it.
+  async function run() {
+    const src = state.sources.find((s) => s.id === state.activeId);
+    if (!src) return;
+    const opt = state.exportOpt;
+    const isCrop = state.mode === "crop";
+    const isCollage = state.mode === "collage";
+
+    // Resolve target dims + a draw routine per mode.
+    let Cw, Ch, ratioLabel, draw;
+    if (isCollage) {
+      const r = collageMode.ratioNums();
+      ({ Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig));
+      ratioLabel = "kolase";
+      draw = (ctx) => collageMode.drawComposite(ctx, Cw, Ch);
+    } else if (isCrop) {
+      const eb = cropMode.exportBox();                 // box in full-res source px
+      const r = eb.ratio;                              // crop ratio numbers
+      ({ Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig));
+      ratioLabel = state.crop.ratio === "original" ? "asli" : state.crop.ratio;
+      draw = (ctx) => ctx.drawImage(src.bitmap, eb.box.x, eb.box.y, eb.box.w, eb.box.h, 0, 0, Cw, Ch);
+    } else {
+      const f = state.frame;
+      const r = geometryCore.parseRatio(f.ratio, src.w, src.h);
+      ({ Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig));
+      ratioLabel = f.ratio;
+      draw = (ctx) => compositor.composeFrame(ctx, src.bitmap, src.w, src.h, Cw, Ch, f);
+    }
+
+    ui.setBusy(true);
+    let canvas = null;
+    try {
+      canvas = document.createElement("canvas");
+      canvas.width = Cw; canvas.height = Ch;
+      const ctx = canvas.getContext("2d", { alpha: opt.format === "png" });
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+      draw(ctx); // same geometry as the live preview
+
+      const type = opt.format === "png" ? "image/png" : "image/jpeg";
+      const quality = opt.format === "png" ? undefined : opt.quality;
+      const blob = await canvasToBlob(canvas, type, quality);
+      const ext = opt.format === "png" ? "png" : "jpg";
+      await deliver(blob, tsName(ratioLabel, ext));
+    } catch (e) {
+      console.error("export failed", e);
+      ui.toast(STRINGS.exportFail);
+    } finally {
+      // Release the export canvas immediately (memory discipline).
+      if (canvas) { canvas.width = 0; canvas.height = 0; }
+      ui.setBusy(false);
+    }
+  }
+
+  return { run, deliverMany, triggerDownload };
+})();
+
+
+/* ===========================================================================
+ * cropMode — manual crop via Pointer Events. State is resolution-independent:
+ * { ratio, zoom, cx, cy } with cx/cy as source fractions. computeCropBoxLocked
+ * is scale-equivariant, so the SAME state yields the preview box (working dims)
+ * and the export box (full-res dims). Gestures mutate zoom/cx/cy only.
+ * ======================================================================== */
+const cropMode = (function () {
+  const stage = document.getElementById("stage");
+  const pointers = new Map(); // pointerId -> {x,y}
+  let pinchPrev = 0;
+
+  function ratioNums() {
+    const src = renderer.activeSource();
+    return geometryCore.parseRatio(state.crop.ratio, src ? src.w : 1, src ? src.h : 1);
+  }
+
+  // Fixed crop viewport rectangle on the gray stage (CSS px), letter-fit.
+  function viewport(wsW, wsH) {
+    const r = ratioNums();
+    const pad = 14;
+    const shape = geometryCore.canvasDimsForRatio(r.w, r.h, 1000);
+    const fit = geometryCore.computeContainRect(shape.Cw, shape.Ch, wsW - 2 * pad, wsH - 2 * pad);
+    return { x: pad + fit.x, y: pad + fit.y, w: fit.w, h: fit.h };
+  }
+
+  function boxFor(W, H) {
+    const r = ratioNums();
+    return geometryCore.computeCropBoxLocked({
+      sourceW: W, sourceH: H, ratioW: r.w, ratioH: r.h,
+      zoom: state.crop.zoom, centerX: state.crop.cx * W, centerY: state.crop.cy * H,
+    });
+  }
+
+  // Snap cx/cy to the clamped centre so state never drifts out of bounds.
+  function syncCenterFrom(box, W, H) {
+    state.crop.cx = (box.x + box.w / 2) / W;
+    state.crop.cy = (box.y + box.h / 2) / H;
+  }
+
+  function reset() {
+    state.crop.zoom = 1; state.crop.cx = 0.5; state.crop.cy = 0.5;
+    renderer.draw();
+  }
+
+  function onDown(e) {
+    if (state.mode !== "crop" || !state.work) return;
+    stage.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) pinchPrev = pinchDist();
+  }
+  function pinchDist() {
+    const p = [...pointers.values()];
+    return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+  }
+  function pinchMid() {
+    const p = [...pointers.values()];
+    return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+  }
+
+  function onMove(e) {
+    if (state.mode !== "crop" || !pointers.has(e.pointerId) || !state.work) return;
+    const prev = pointers.get(e.pointerId);
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    const ws = document.getElementById("workspace");
+    const wsW = ws.clientWidth, wsH = ws.clientHeight;
+    const vp = viewport(wsW, wsH);
+    const work = state.work;
+    const box = boxFor(work.w, work.h);
+
+    if (pointers.size >= 2) {
+      const d = pinchDist();
+      if (pinchPrev > 0 && d > 0) {
+        const factor = d / pinchPrev;
+        const mid = pinchMid();
+        const sr = stage.getBoundingClientRect();
+        const fx = geometryCore.clamp((mid.x - sr.left - vp.x) / vp.w, 0, 1);
+        const fy = geometryCore.clamp((mid.y - sr.top - vp.y) / vp.h, 0, 1);
+        const r = ratioNums();
+        const z = geometryCore.cropZoomAboutPoint({
+          sourceW: work.w, sourceH: work.h, ratioW: r.w, ratioH: r.h,
+          zoom: state.crop.zoom, centerX: state.crop.cx * work.w, centerY: state.crop.cy * work.h,
+          factor, fx, fy,
+        });
+        state.crop.zoom = z.zoom;
+        state.crop.cx = z.centerX / work.w;
+        state.crop.cy = z.centerY / work.h;
+        syncCenterFrom(boxFor(work.w, work.h), work.w, work.h);
+      }
+      pinchPrev = d;
+    } else {
+      const dCenterX = -dx * (box.w / vp.w);
+      const dCenterY = -dy * (box.h / vp.h);
+      state.crop.cx += dCenterX / work.w;
+      state.crop.cy += dCenterY / work.h;
+      syncCenterFrom(boxFor(work.w, work.h), work.w, work.h);
+    }
+    renderer.draw();
+  }
+
+  function onUp(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchPrev = 0;
+  }
+
+  function bind() {
+    stage.addEventListener("pointerdown", onDown);
+    stage.addEventListener("pointermove", onMove);
+    stage.addEventListener("pointerup", onUp);
+    stage.addEventListener("pointercancel", onUp);
+  }
+
+  // Crop viewport preview: cropped region bright, rest dimmed, thirds grid.
+  function drawPreview(ctx, wsW, wsH) {
+    const work = state.work;
+    const vp = viewport(wsW, wsH);
+    const box = boxFor(work.w, work.h);
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(0, 0, wsW, wsH);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(vp.x, vp.y, vp.w, vp.h); ctx.clip();
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(work.bitmap, box.x, box.y, box.w, box.h, vp.x, vp.y, vp.w, vp.h);
+    ctx.restore();
+    ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 1.5;
+    ctx.strokeRect(vp.x + 0.5, vp.y + 0.5, vp.w - 1, vp.h - 1);
+    ctx.strokeStyle = "rgba(255,255,255,.32)"; ctx.lineWidth = 1;
+    for (let i = 1; i < 3; i++) {
+      const gx = vp.x + (vp.w * i) / 3, gy = vp.y + (vp.h * i) / 3;
+      ctx.beginPath(); ctx.moveTo(gx, vp.y); ctx.lineTo(gx, vp.y + vp.h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(vp.x, gy); ctx.lineTo(vp.x + vp.w, gy); ctx.stroke();
+    }
+  }
+
+  function exportBox() {
+    const src = renderer.activeSource();
+    return { box: boxFor(src.w, src.h), ratio: ratioNums() };
+  }
+
+  return { bind, reset, drawPreview, exportBox, ratioNums };
+})();
+
+/* ===========================================================================
+ * collageMode — grid compositing. Tiling comes from the P1-tested
+ * computeCollageLayout (exact integer cells, gutters exactly G). Each cell's
+ * visible region is computeCropBoxLocked with the CELL's aspect ratio, so
+ * per-cell cover + pan/zoom reuses tested math with no new geometry.
+ * ======================================================================== */
+const collageMode = (function () {
+  const stage = document.getElementById("stage");
+  const pointers = new Map();
+  let pinchPrev = 0;
+  let gesture = null;     // { idx, snapshot, moved }
+  let hoverTarget = -1;   // cell index a swap-drag is hovering
+
+  function sourceFor(id) { return state.sources.find((s) => s.id === id) || null; }
+
+  // Rebuild the cell array to rows*cols, assigning sources in order (cycling),
+  // preserving each cell's transform/source where still valid.
+  function ensureCells() {
+    const co = state.collage, n = co.rows * co.cols, srcs = state.sources, cur = co.cells;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const prev = cur[i];
+      const stillValid = prev && srcs.some((s) => s.id === prev.srcId);
+      const srcId = stillValid ? prev.srcId : (srcs.length ? srcs[i % srcs.length].id : null);
+      out.push(stillValid ? prev : { srcId, zoom: 1, cx: 0.5, cy: 0.5 });
+    }
+    co.cells = out;
+    if (co.selected >= n) co.selected = 0;
+  }
+
+  function ratioNums() {
+    return geometryCore.parseRatio(state.collage.ratio, 1, 1); // presets only (no 'original')
+  }
+
+  // Integer-exact layout for a given canvas size, with a safe fallback if the
+  // gutter/margin would starve the cells.
+  function layoutFor(Cw, Ch) {
+    const co = state.collage, mn = Math.min(Cw, Ch);
+    const m = Math.round((co.marginPct / 100) * mn);
+    const g = Math.round((co.gutterPct / 100) * mn);
+    try {
+      return geometryCore.computeCollageLayout({ Cw, Ch, rows: co.rows, cols: co.cols, outerMargin: m, gutter: g });
+    } catch (_) {
+      return geometryCore.computeCollageLayout({ Cw, Ch, rows: co.rows, cols: co.cols, outerMargin: 0, gutter: 0 });
+    }
+  }
+
+  // Preview placement: output rectangle (collage ratio) centered on the stage.
+  function placement(wsW, wsH) {
+    const r = ratioNums();
+    const pad = 10;
+    const shape = geometryCore.canvasDimsForRatio(r.w, r.h, 1000);
+    const fit = geometryCore.computeContainRect(shape.Cw, shape.Ch, wsW - 2 * pad, wsH - 2 * pad);
+    const vp = { x: pad + fit.x, y: pad + fit.y, w: fit.w, h: fit.h };
+    return { vp, shape, scale: vp.w / shape.Cw };
+  }
+
+  // CSS cell rects for hit-testing & preview.
+  function cellRectsCss(wsW, wsH) {
+    const pl = placement(wsW, wsH);
+    const lay = layoutFor(pl.shape.Cw, pl.shape.Ch);
+    return lay.cells.map((c, i) => ({
+      i,
+      x: pl.vp.x + c.x * pl.scale, y: pl.vp.y + c.y * pl.scale,
+      w: c.w * pl.scale, h: c.h * pl.scale,
+    }));
+  }
+
+  function hit(rects, px, py) {
+    for (const r of rects) if (px >= r.x && px <= r.x + r.w && py >= r.y && py <= r.y + r.h) return r.i;
+    return -1;
+  }
+
+  // Draw one cell's covered source region into destRect (current ctx space).
+  function drawCellInto(ctx, cell, destRect) {
+    const src = sourceFor(cell.srcId);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(destRect.x, destRect.y, destRect.w, destRect.h); ctx.clip();
+    if (!src) {
+      ctx.fillStyle = "#333"; ctx.fillRect(destRect.x, destRect.y, destRect.w, destRect.h);
+    } else {
+      const box = geometryCore.computeCropBoxLocked({
+        sourceW: src.w, sourceH: src.h, ratioW: destRect.w, ratioH: destRect.h,
+        zoom: cell.zoom, centerX: cell.cx * src.w, centerY: cell.cy * src.h,
+      });
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(src.bitmap, box.x, box.y, box.w, box.h, destRect.x, destRect.y, destRect.w, destRect.h);
+    }
+    ctx.restore();
+  }
+
+  // Re-clamp a cell's centre after pan/zoom so its image always covers the cell.
+  function syncCell(cell, destRect) {
+    const src = sourceFor(cell.srcId);
+    if (!src) return;
+    const box = geometryCore.computeCropBoxLocked({
+      sourceW: src.w, sourceH: src.h, ratioW: destRect.w, ratioH: destRect.h,
+      zoom: cell.zoom, centerX: cell.cx * src.w, centerY: cell.cy * src.h,
+    });
+    cell.cx = (box.x + box.w / 2) / src.w;
+    cell.cy = (box.y + box.h / 2) / src.h;
+  }
+
+  // ----- preview -----
+  function drawPreview(ctx, wsW, wsH) {
+    ensureCells();
+    const co = state.collage;
+    const pl = placement(wsW, wsH);
+    const rects = cellRectsCss(wsW, wsH);
+    // gutter color fills the whole output rect (gutters + outer margin show through)
+    ctx.fillStyle = co.gutterColor;
+    ctx.fillRect(pl.vp.x, pl.vp.y, pl.vp.w, pl.vp.h);
+    rects.forEach((r) => drawCellInto(ctx, co.cells[r.i], r));
+    // selection + swap-target overlays
+    rects.forEach((r) => {
+      if (r.i === hoverTarget) {
+        ctx.strokeStyle = "#4A9EFF"; ctx.setLineDash([6, 4]); ctx.lineWidth = 3;
+        ctx.strokeRect(r.x + 1.5, r.y + 1.5, r.w - 3, r.h - 3); ctx.setLineDash([]);
+      } else if (r.i === co.selected) {
+        ctx.strokeStyle = "#4A9EFF"; ctx.lineWidth = 2.5;
+        ctx.strokeRect(r.x + 1.25, r.y + 1.25, r.w - 2.5, r.h - 2.5);
+      }
+    });
+  }
+
+  // ----- export (full-res composite into ctx of size Cw×Ch) -----
+  function drawComposite(ctx, Cw, Ch) {
+    ensureCells();
+    const co = state.collage;
+    ctx.fillStyle = co.gutterColor;
+    ctx.fillRect(0, 0, Cw, Ch);
+    const lay = layoutFor(Cw, Ch);
+    lay.cells.forEach((c, i) => drawCellInto(ctx, co.cells[i], { x: c.x, y: c.y, w: c.w, h: c.h }));
+  }
+
+  // ----- gestures -----
+  function onDown(e) {
+    if (state.mode !== "collage" || !state.sources.length) return;
+    stage.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2) { pinchPrev = pdist(); return; }
+    const ws = document.getElementById("workspace");
+    const sr = stage.getBoundingClientRect();
+    const rects = cellRectsCss(ws.clientWidth, ws.clientHeight);
+    const idx = hit(rects, e.clientX - sr.left, e.clientY - sr.top);
+    if (idx < 0) return;
+    state.collage.selected = idx;
+    gesture = { idx, moved: 0, snapshot: { ...state.collage.cells[idx] } };
+    hoverTarget = -1;
+    renderer.draw();
+  }
+  function pdist() { const p = [...pointers.values()]; return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); }
+  function pmid() { const p = [...pointers.values()]; return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }; }
+
+  function onMove(e) {
+    if (state.mode !== "collage" || !pointers.has(e.pointerId)) return;
+    const prev = pointers.get(e.pointerId);
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const ws = document.getElementById("workspace");
+    const wsW = ws.clientWidth, wsH = ws.clientHeight;
+    const sr = stage.getBoundingClientRect();
+    const rects = cellRectsCss(wsW, wsH);
+
+    if (pointers.size >= 2) {
+      const d = pdist();
+      if (pinchPrev > 0 && d > 0) {
+        const sel = state.collage.selected, cell = state.collage.cells[sel];
+        const rect = rects[sel]; const src = sourceFor(cell.srcId);
+        if (rect && src) {
+          const mid = pmid();
+          const fx = geometryCore.clamp((mid.x - sr.left - rect.x) / rect.w, 0, 1);
+          const fy = geometryCore.clamp((mid.y - sr.top - rect.y) / rect.h, 0, 1);
+          const z = geometryCore.cropZoomAboutPoint({
+            sourceW: src.w, sourceH: src.h, ratioW: rect.w, ratioH: rect.h,
+            zoom: cell.zoom, centerX: cell.cx * src.w, centerY: cell.cy * src.h, factor: d / pinchPrev, fx, fy,
+          });
+          cell.zoom = z.zoom; cell.cx = z.centerX / src.w; cell.cy = z.centerY / src.h;
+          syncCell(cell, rect);
+        }
+      }
+      pinchPrev = d;
+      hoverTarget = -1;
+      renderer.draw();
+      return;
+    }
+    if (!gesture) return;
+    gesture.moved += Math.hypot(dx, dy);
+    const overIdx = hit(rects, e.clientX - sr.left, e.clientY - sr.top);
+    if (gesture.moved > 10 && overIdx >= 0 && overIdx !== gesture.idx) {
+      // swap intent: revert any pan, highlight target
+      state.collage.cells[gesture.idx] = { ...gesture.snapshot };
+      hoverTarget = overIdx;
+    } else {
+      // pan the active cell
+      hoverTarget = -1;
+      const cell = state.collage.cells[gesture.idx], rect = rects[gesture.idx], src = sourceFor(cell.srcId);
+      if (rect && src) {
+        const box = geometryCore.computeCropBoxLocked({
+          sourceW: src.w, sourceH: src.h, ratioW: rect.w, ratioH: rect.h,
+          zoom: cell.zoom, centerX: cell.cx * src.w, centerY: cell.cy * src.h,
+        });
+        cell.cx += (-dx * (box.w / rect.w)) / src.w;
+        cell.cy += (-dy * (box.h / rect.h)) / src.h;
+        syncCell(cell, rect);
+      }
+    }
+    renderer.draw();
+  }
+
+  function onUp(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchPrev = 0;
+    if (gesture && hoverTarget >= 0 && hoverTarget !== gesture.idx) {
+      const cells = state.collage.cells;
+      const t = cells[gesture.idx]; cells[gesture.idx] = cells[hoverTarget]; cells[hoverTarget] = t;
+      state.collage.selected = hoverTarget;
+    }
+    hoverTarget = -1; gesture = null;
+    if (state.mode === "collage") renderer.draw();
+  }
+
+  function bind() {
+    stage.addEventListener("pointerdown", onDown);
+    stage.addEventListener("pointermove", onMove);
+    stage.addEventListener("pointerup", onUp);
+    stage.addEventListener("pointercancel", onUp);
+  }
+
+  return { bind, ensureCells, drawPreview, drawComposite, ratioNums };
+})();
+
+/* ===========================================================================
+ * carouselMode — seamless split. Tiles are forced to EQUAL width (Wc = N×tileW)
+ * so boundaries land on exact multiples (computeCarouselBoundaries) — the seam
+ * is pixel-perfect and IG performs no per-tile resize. Each tile is rendered
+ * directly from the source (offset by -b[k]); the giant composite is never
+ * materialised, so memory stays flat regardless of N.
+ * ======================================================================== */
+const carouselMode = (function () {
+  const stage = document.getElementById("stage");
+  let drag = null; // { lastX }
+
+  // tileW: 1080 for IG (equal tiles → perfect seam), 1440 for hi-res.
+  function composite() {
+    const c = state.carousel, N = c.n;
+    const r = geometryCore.parseRatio(c.tileRatio, 1, 1);
+    const tileW = state.exportOpt.ig ? CONFIG.IG_WIDTH : 1440;
+    const Hc = Math.round(tileW * (r.h / r.w));
+    const Wc = N * tileW;                                   // exact equal tiles
+    const b = geometryCore.computeCarouselBoundaries(Wc, N); // = k*tileW
+    return { N, tileW, Hc, Wc, b };
+  }
+
+  function compRect(src, Wc, Hc) {
+    return geometryCore.computeFillRect(src.w, src.h, Wc, Hc, state.carousel.fill);
+  }
+
+  // Draw tile k (composite columns [b[k],b[k+1])) into dest rect.
+  function drawTile(ctx, k, src, comp, b, Hc, dest) {
+    const tileW = b[k + 1] - b[k];
+    ctx.save();
+    ctx.beginPath(); ctx.rect(dest.x, dest.y, dest.w, dest.h); ctx.clip();
+    if (state.carousel.fill === "fit") { ctx.fillStyle = "#000"; ctx.fillRect(dest.x, dest.y, dest.w, dest.h); }
+    ctx.translate(dest.x, dest.y);
+    ctx.scale(dest.w / tileW, dest.h / Hc);
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(src.bitmap, comp.x - b[k], comp.y, comp.w, comp.h); // -b[k] selects the slice
+    ctx.restore();
+  }
+
+  // Preview metrics (tile display size + horizontal pitch).
+  function metrics(wsW, wsH) {
+    const { tileW, Hc } = composite();
+    const dispH = wsH * 0.78;
+    const dispW = dispH * (tileW / Hc);
+    const gut = Math.max(6, wsW * 0.025);
+    return { dispW, dispH, pitch: dispW + gut };
+  }
+
+  function drawPreview(ctx, wsW, wsH) {
+    const src = renderer.activeSource();
+    if (!src) return;
+    const { N, Hc, Wc, b } = composite();
+    const comp = compRect(src, Wc, Hc);
+    const m = metrics(wsW, wsH);
+    const c = state.carousel;
+    c.pos = geometryCore.clamp(c.pos, 0, N - 1);
+    const cx = wsW / 2, midY = wsH / 2;
+
+    for (let k = 0; k < N; k++) {
+      const x = cx + (k - c.pos) * m.pitch - m.dispW / 2;
+      if (x + m.dispW < 0 || x > wsW) continue;
+      const dest = { x, y: midY - m.dispH / 2, w: m.dispW, h: m.dispH };
+      drawTile(ctx, k, src, comp, b, Hc, dest);
+      ctx.strokeStyle = "rgba(255,255,255,.5)"; ctx.lineWidth = 1;
+      ctx.strokeRect(dest.x + 0.5, dest.y + 0.5, dest.w - 1, dest.h - 1);
+    }
+    // page dots
+    const dotsY = midY + m.dispH / 2 + 22, dotR = 3.5, gap = 16;
+    const totalW = (N - 1) * gap;
+    for (let k = 0; k < N; k++) {
+      const dx = cx - totalW / 2 + k * gap;
+      ctx.beginPath(); ctx.arc(dx, dotsY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = Math.round(c.pos) === k ? "#4A9EFF" : "rgba(255,255,255,.3)";
+      ctx.fill();
+    }
+  }
+
+  // ----- gestures: horizontal swipe with snap -----
+  function onDown(e) {
+    if (state.mode !== "carousel" || !state.work) return;
+    stage.setPointerCapture(e.pointerId);
+    drag = { lastX: e.clientX };
+  }
+  function onMove(e) {
+    if (state.mode !== "carousel" || !drag) return;
+    const ws = document.getElementById("workspace");
+    const m = metrics(ws.clientWidth, ws.clientHeight);
+    const dx = e.clientX - drag.lastX; drag.lastX = e.clientX;
+    state.carousel.pos = geometryCore.clamp(state.carousel.pos - dx / m.pitch, 0, state.carousel.n - 1);
+    renderer.draw();
+  }
+  function onUp() {
+    if (!drag) return;
+    drag = null;
+    state.carousel.pos = Math.round(state.carousel.pos); // snap to a tile
+    renderer.draw();
+  }
+  function bind() {
+    stage.addEventListener("pointerdown", onDown);
+    stage.addEventListener("pointermove", onMove);
+    stage.addEventListener("pointerup", onUp);
+    stage.addEventListener("pointercancel", onUp);
+  }
+
+  // ----- export N tiles in upload order, sequentially (flat memory) -----
+  async function exportTiles() {
+    const src = renderer.activeSource();
+    if (!src) return;
+    const { N, Hc, Wc, b } = composite();
+    const comp = compRect(src, Wc, Hc);
+    const opt = state.exportOpt;
+    const ext = opt.format === "png" ? "png" : "jpg";
+    const type = opt.format === "png" ? "image/png" : "image/jpeg";
+    const names = geometryCore.carouselFilenames(N, "seamless", ext);
+
+    ui.setBusy(true);
+    try {
+      const files = [];
+      for (let k = 0; k < N; k++) {
+        const w = b[k + 1] - b[k];
+        const cv = document.createElement("canvas");
+        cv.width = w; cv.height = Hc;
+        const ctx = cv.getContext("2d", { alpha: opt.format === "png" });
+        if (state.carousel.fill === "fit") { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, Hc); }
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(src.bitmap, comp.x - b[k], comp.y, comp.w, comp.h);
+        const quality = opt.format === "png" ? undefined : opt.quality;
+        const blob = await new Promise((res) => cv.toBlob(res, type, quality));
+        files.push(new File([blob], names[k], { type: blob.type }));
+        cv.width = 0; cv.height = 0; // release each tile before the next
+      }
+      await exporter.deliverMany(files);
+    } catch (e) {
+      console.error("carousel export", e);
+      ui.toast(STRINGS.exportFail);
+    } finally {
+      ui.setBusy(false);
+    }
+  }
+
+  return { bind, drawPreview, exportTiles, composite, compRect, drawTile };
+})();
+
+const ui = (function () {
+  const empty = document.getElementById("empty");
+  const filmstrip = document.getElementById("filmstrip");
+  const picker = document.getElementById("filePicker");
+  const busy = document.getElementById("busy");
+  const workspace = document.getElementById("workspace");
+
+  function applyStrings() {
+    document.getElementById("appTitle").textContent = STRINGS.appTitle;
+    document.getElementById("emptyHint").innerHTML = STRINGS.emptyTitle + "<br>" + STRINGS.emptySub;
+    document.getElementById("btnImport").textContent = STRINGS.import;
+    document.getElementById("dropHint").textContent = STRINGS.dropHint;
+    document.getElementById("btnAddTop").setAttribute("aria-label", STRINGS.addPhoto);
+    document.getElementById("lblFrame").textContent = STRINGS.modes.frame;
+    document.getElementById("lblCrop").textContent = STRINGS.modes.crop;
+    document.getElementById("lblCollage").textContent = STRINGS.modes.collage;
+    document.getElementById("lblCarousel").textContent = STRINGS.modes.carousel;
+    document.getElementById("labRatio").textContent = STRINGS.ratio;
+    document.getElementById("chipOriginal").textContent = STRINGS.original;
+    document.getElementById("labMargin").textContent = STRINGS.margin;
+    document.getElementById("labBg").textContent = STRINGS.background;
+    document.getElementById("bgSolid").textContent = STRINGS.bgSolid;
+    document.getElementById("bgBlur").textContent = STRINGS.bgBlur;
+    document.getElementById("labFrameColor").textContent = STRINGS.frameColor;
+    document.getElementById("labExportSize").textContent = STRINGS.exportSize;
+    document.getElementById("sizeIG").textContent = STRINGS.sizeIG;
+    document.getElementById("sizeHi").textContent = STRINGS.sizeHi;
+    document.getElementById("labQuality").textContent = STRINGS.quality;
+    document.getElementById("labFormat").textContent = STRINGS.format;
+    document.getElementById("fmtJpeg").textContent = STRINGS.fmtJpeg;
+    document.getElementById("fmtPng").textContent = STRINGS.fmtPng;
+    document.getElementById("btnExport").textContent = STRINGS.exportBtn;
+    document.getElementById("labCropRatio").textContent = STRINGS.ratio;
+    document.getElementById("cropHint").textContent = STRINGS.cropHint;
+    document.getElementById("cropChipOriginal").textContent = STRINGS.original;
+    document.getElementById("btnCropReset").textContent = STRINGS.reset;
+    document.getElementById("btnCropExport").textContent = STRINGS.exportBtn;
+    document.getElementById("cropExportNote").textContent = STRINGS.cropExportNote;
+    document.getElementById("labGrid").textContent = STRINGS.grid;
+    document.getElementById("labColRatio").textContent = STRINGS.ratio;
+    document.getElementById("labGutter").textContent = STRINGS.gutter;
+    document.getElementById("labColMargin").textContent = STRINGS.outerMargin;
+    document.getElementById("labGutterColor").textContent = STRINGS.gutterColor;
+    document.getElementById("collageHint").textContent = STRINGS.collageHint;
+    document.getElementById("btnCollageExport").textContent = STRINGS.exportBtn;
+    document.getElementById("labTiles").textContent = STRINGS.tiles;
+    document.getElementById("labTileRatio").textContent = STRINGS.tileRatio;
+    document.getElementById("labFill").textContent = STRINGS.fill;
+    document.getElementById("fillCover").textContent = STRINGS.fillCover;
+    document.getElementById("fillFit").textContent = STRINGS.fillFit;
+    document.getElementById("carouselHint").textContent = STRINGS.carouselHint;
+    document.getElementById("carouselNote").textContent = STRINGS.carouselNote;
+    document.getElementById("btnCarouselExport").textContent = STRINGS.exportBtn;
+    document.getElementById("tilesMinus").textContent = "\u2212";
+    document.getElementById("labBlur").textContent = STRINGS.blurStrength;
+    document.getElementById("labPresets").textContent = STRINGS.presets;
+    document.getElementById("btnSavePreset").textContent = STRINGS.savePreset;
+    document.getElementById("btnInstall").setAttribute("aria-label", STRINGS.install);
+    updateExportNote();
+  }
+
+  // ----- frame control panel -------------------------------------------------
+
+  // Compose the contextual export note (size profile, format, upscale warning).
+  function updateExportNote() {
+    const opt = state.exportOpt, f = state.frame, note = document.getElementById("exportNote");
+    if (!note) return;
+    let txt = opt.ig ? STRINGS.igNote : STRINGS.hiNote;
+    if (opt.format === "png") txt += " " + STRINGS.pngNote;
+    note.className = "note";
+    // Upscale warning: IG target width 1080 but source narrower than the frame inner area.
+    const src = renderer.activeSource && renderer.activeSource();
+    if (src && opt.ig) {
+      const r = geometryCore.parseRatio(f.ratio, src.w, src.h);
+      const dims = compositor.exportDims(r.w, r.h, true);
+      const innerW = dims.Cw * (1 - 2 * (f.marginPct / 100));
+      if (src.w < innerW - 1) { txt = STRINGS.upscaleWarn + " " + txt; note.className = "note warn"; }
+    }
+    note.textContent = txt;
+  }
+
+  function pressGroup(selector, attr, value) {
+    document.querySelectorAll(selector).forEach((el) =>
+      el.setAttribute("aria-pressed", String(el.dataset[attr] === String(value))));
+  }
+
+  function syncFrameRows() {
+    // Frame-color row only for solid bg; blur row only for blur bg; quality only for JPEG.
+    document.getElementById("frameColorRow").style.display = state.frame.bg === "solid" ? "" : "none";
+    document.getElementById("blurRow").style.display = state.frame.bg === "blur" ? "" : "none";
+    document.getElementById("qualityRow").style.display = state.exportOpt.format === "jpeg" ? "" : "none";
+  }
+
+  // Push current state into the frame-sheet controls (after preset/restore).
+  function syncFrameControlsFromState() {
+    const f = state.frame, o = state.exportOpt;
+    pressGroup("#ratioChips .chip", "ratio", f.ratio);
+    document.getElementById("marginRange").value = f.marginPct;
+    document.getElementById("marginVal").textContent = f.marginPct + "%";
+    pressGroup("#bgSeg button", "bg", f.bg);
+    document.getElementById("blurRange").value = Math.round(f.blurStrength * 100);
+    document.getElementById("blurVal").textContent = Math.round(f.blurStrength * 100) + "%";
+    const swatches = document.querySelectorAll("#frameSwatches .sw");
+    let matched = false;
+    swatches.forEach((s) => {
+      const on = s.dataset.color && s.dataset.color.toUpperCase() === f.frameColor.toUpperCase();
+      s.setAttribute("aria-pressed", String(!!on)); if (on) matched = true;
+    });
+    if (!matched) document.getElementById("customSw").setAttribute("aria-pressed", "true");
+    pressGroup("#sizeSeg button", "ig", o.ig ? "1" : "0");
+    document.getElementById("qualityRange").value = Math.round(o.quality * 100);
+    document.getElementById("qualityVal").textContent = Math.round(o.quality * 100);
+    pressGroup("#formatSeg button", "fmt", o.format);
+    syncFrameRows();
+  }
+
+  function renderPresets() {
+    const wrap = document.getElementById("presetChips");
+    wrap.innerHTML = "";
+    persistence.listPresets().forEach((p) => {
+      const chip = document.createElement("button");
+      chip.className = "chip";
+      chip.textContent = p.name;
+      chip.addEventListener("click", () => {
+        if (persistence.applyPreset(p.name)) { syncFrameControlsFromState(); updateExportNote(); renderer.draw(); persistence.scheduleSave(); }
+      });
+      const x = document.createElement("span");
+      x.textContent = " \u00d7"; x.style.opacity = ".6"; x.style.marginLeft = "2px";
+      x.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (confirm(STRINGS.deletePreset)) { persistence.deletePreset(p.name); renderPresets(); }
+      });
+      chip.appendChild(x);
+      wrap.appendChild(chip);
+    });
+  }
+
+  function bindFrameControls() {
+    // Ratio chips
+    document.querySelectorAll("#ratioChips .chip").forEach((c) =>
+      c.addEventListener("click", () => {
+        state.frame.ratio = c.dataset.ratio;
+        pressGroup("#ratioChips .chip", "ratio", c.dataset.ratio);
+        renderer.draw(); updateExportNote();
+      }));
+    // Margin
+    const mr = document.getElementById("marginRange");
+    mr.addEventListener("input", () => {
+      state.frame.marginPct = +mr.value;
+      document.getElementById("marginVal").textContent = mr.value + "%";
+      renderer.draw(); updateExportNote();
+    });
+    // Background mode
+    document.querySelectorAll("#bgSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        state.frame.bg = b.dataset.bg;
+        pressGroup("#bgSeg button", "bg", b.dataset.bg);
+        syncFrameRows(); renderer.draw();
+      }));
+    // Frame color swatches
+    document.querySelectorAll("#frameSwatches .sw[data-color]").forEach((s) =>
+      s.addEventListener("click", () => {
+        state.frame.frameColor = s.dataset.color;
+        document.querySelectorAll("#frameSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
+        s.setAttribute("aria-pressed", "true");
+        renderer.draw();
+      }));
+    const cc = document.getElementById("customColor");
+    cc.addEventListener("input", () => {
+      state.frame.frameColor = cc.value;
+      document.querySelectorAll("#frameSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
+      document.getElementById("customSw").setAttribute("aria-pressed", "true");
+      renderer.draw();
+    });
+    // Export size profile
+    document.querySelectorAll("#sizeSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        state.exportOpt.ig = b.dataset.ig === "1";
+        pressGroup("#sizeSeg button", "ig", b.dataset.ig);
+        updateExportNote();
+      }));
+    // Quality
+    const qr = document.getElementById("qualityRange");
+    qr.addEventListener("input", () => {
+      state.exportOpt.quality = +qr.value / 100;
+      document.getElementById("qualityVal").textContent = qr.value;
+    });
+    // Format
+    document.querySelectorAll("#formatSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        state.exportOpt.format = b.dataset.fmt;
+        pressGroup("#formatSeg button", "fmt", b.dataset.fmt);
+        syncFrameRows(); updateExportNote();
+      }));
+    // Export
+    document.getElementById("btnExport").addEventListener("click", () => exporter.run());
+    // Blur strength
+    const br = document.getElementById("blurRange");
+    br.addEventListener("input", () => {
+      state.frame.blurStrength = +br.value / 100;
+      document.getElementById("blurVal").textContent = br.value + "%";
+      renderer.draw();
+    });
+    // Save preset
+    document.getElementById("btnSavePreset").addEventListener("click", () => {
+      const name = (prompt(STRINGS.promptName) || "").trim();
+      if (!name) return;
+      persistence.savePreset(name);
+      renderPresets();
+      toast(STRINGS.presetSaved);
+    });
+    renderPresets();
+    syncFrameRows();
+  }
+
+  function bindCropControls() {
+    document.querySelectorAll("#cropRatioChips .chip").forEach((c) =>
+      c.addEventListener("click", () => {
+        state.crop.ratio = c.dataset.ratio;
+        // re-clamp current centre into the new ratio's box
+        state.crop.zoom = 1; state.crop.cx = 0.5; state.crop.cy = 0.5;
+        pressGroup("#cropRatioChips .chip", "ratio", c.dataset.ratio);
+        renderer.draw();
+      }));
+    document.getElementById("btnCropReset").addEventListener("click", () => cropMode.reset());
+    document.getElementById("btnCropExport").addEventListener("click", () => exporter.run());
+  }
+
+  function bindCollageControls() {
+    const co = state.collage;
+    document.querySelectorAll("#gridChips .chip").forEach((c) =>
+      c.addEventListener("click", () => {
+        co.rows = +c.dataset.rows; co.cols = +c.dataset.cols;
+        document.querySelectorAll("#gridChips .chip").forEach((x) =>
+          x.setAttribute("aria-pressed", String(x === c)));
+        collageMode.ensureCells(); renderer.draw();
+      }));
+    document.querySelectorAll("#collageRatioChips .chip").forEach((c) =>
+      c.addEventListener("click", () => {
+        co.ratio = c.dataset.ratio;
+        pressGroup("#collageRatioChips .chip", "ratio", c.dataset.ratio);
+        renderer.draw();
+      }));
+    const gr = document.getElementById("gutterRange");
+    gr.addEventListener("input", () => {
+      co.gutterPct = +gr.value;
+      document.getElementById("gutterVal").textContent = gr.value + "%";
+      renderer.draw();
+    });
+    const cm = document.getElementById("colMarginRange");
+    cm.addEventListener("input", () => {
+      co.marginPct = +cm.value;
+      document.getElementById("colMarginVal").textContent = cm.value + "%";
+      renderer.draw();
+    });
+    document.querySelectorAll("#gutterSwatches .sw[data-color]").forEach((s) =>
+      s.addEventListener("click", () => {
+        co.gutterColor = s.dataset.color;
+        document.querySelectorAll("#gutterSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
+        s.setAttribute("aria-pressed", "true");
+        renderer.draw();
+      }));
+    const gcc = document.getElementById("gutterCustomColor");
+    gcc.addEventListener("input", () => {
+      co.gutterColor = gcc.value;
+      document.querySelectorAll("#gutterSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
+      document.getElementById("gutterCustomSw").setAttribute("aria-pressed", "true");
+      renderer.draw();
+    });
+    document.getElementById("btnCollageExport").addEventListener("click", () => exporter.run());
+  }
+
+  function bindCarouselControls() {
+    const c = state.carousel;
+    const setTiles = (n) => {
+      c.n = geometryCore.clamp(n, 2, 10);
+      document.getElementById("tilesVal").textContent = String(c.n);
+      c.pos = geometryCore.clamp(c.pos, 0, c.n - 1);
+      renderer.draw();
+    };
+    document.getElementById("tilesMinus").addEventListener("click", () => setTiles(c.n - 1));
+    document.getElementById("tilesPlus").addEventListener("click", () => setTiles(c.n + 1));
+    document.querySelectorAll("#tileRatioChips .chip").forEach((b) =>
+      b.addEventListener("click", () => {
+        c.tileRatio = b.dataset.ratio;
+        pressGroup("#tileRatioChips .chip", "ratio", b.dataset.ratio);
+        renderer.draw();
+      }));
+    document.querySelectorAll("#fillSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        c.fill = b.dataset.fill;
+        pressGroup("#fillSeg button", "fill", b.dataset.fill);
+        renderer.draw();
+      }));
+    document.getElementById("btnCarouselExport").addEventListener("click", () => carouselMode.exportTiles());
+  }
+
+  function setBusy(on) { busy.classList.toggle("show", !!on); }
+
+  // Minimal non-blocking toast (no dependency).
+  let toastEl = null, toastT = null;
+  function toast(msg) {
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      Object.assign(toastEl.style, {
+        position: "fixed", left: "50%", bottom: "calc(var(--toolbar-h) + 18px)",
+        transform: "translateX(-50%)", background: "#000", color: "#fff",
+        padding: "9px 14px", borderRadius: "10px", fontSize: "13px", maxWidth: "82%",
+        textAlign: "center", zIndex: "50", opacity: "0", transition: "opacity .18s",
+        pointerEvents: "none",
+      });
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = msg;
+    toastEl.style.opacity = "1";
+    clearTimeout(toastT);
+    toastT = setTimeout(() => { toastEl.style.opacity = "0"; }, 2200);
+  }
+
+  function refreshEmpty() {
+    const has = state.sources.length > 0;
+    empty.classList.toggle("hidden", has);
+    document.getElementById("stage").style.display = has ? "block" : "none";
+  }
+
+  function refreshFilmstrip() {
+    const has = state.sources.length > 0;
+    filmstrip.classList.toggle("hidden", !has);
+    filmstrip.innerHTML = "";
+    state.sources.forEach((s) => {
+      const t = document.createElement("div");
+      t.className = "thumb" + (s.id === state.activeId ? " active" : "");
+      const img = document.createElement("img");
+      img.src = s.thumbUrl; img.alt = s.name;
+      t.appendChild(img);
+      const x = document.createElement("div");
+      x.className = "x"; x.textContent = "\u00d7";
+      x.addEventListener("click", (ev) => { ev.stopPropagation(); removeSource(s.id); });
+      t.appendChild(x);
+      t.addEventListener("click", () => setActive(s.id));
+      filmstrip.appendChild(t);
+    });
+    const add = document.createElement("div");
+    add.className = "thumb add"; add.textContent = "+";
+    add.addEventListener("click", openPicker);
+    filmstrip.appendChild(add);
+  }
+
+  async function setActive(id) {
+    if (state.activeId === id) return;
+    state.activeId = id;
+    await renderer.useActive();
+    refreshFilmstrip();
+    updateExportNote();
+  }
+
+  function removeSource(id) {
+    const idx = state.sources.findIndex((s) => s.id === id);
+    if (idx < 0) return;
+    const [src] = state.sources.splice(idx, 1);
+    importer.disposeSource(src);
+    if (state.activeId === id) {
+      state.activeId = state.sources.length ? state.sources[Math.max(0, idx - 1)].id : null;
+    }
+    renderer.useActive().then(() => { refreshFilmstrip(); refreshEmpty(); });
+  }
+
+  function openPicker() { picker.value = ""; picker.click(); }
+
+  function setMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll(".mode").forEach((b) =>
+      b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
+    document.getElementById("sheetFrame").classList.toggle("hidden", mode !== "frame");
+    document.getElementById("sheetCrop").classList.toggle("hidden", mode !== "crop");
+    document.getElementById("sheetCollage").classList.toggle("hidden", mode !== "collage");
+    document.getElementById("sheetCarousel").classList.toggle("hidden", mode !== "carousel");
+    if (mode === "frame") { updateExportNote(); renderer.draw(); }
+    else if (mode === "crop") { renderer.draw(); }
+    else if (mode === "collage") { collageMode.ensureCells(); renderer.draw(); }
+    else if (mode === "carousel") { state.carousel.pos = 0; renderer.draw(); }
+    else toast(STRINGS.modeSoon);
+  }
+
+  function bind() {
+    document.getElementById("btnImport").addEventListener("click", openPicker);
+    document.getElementById("btnAddTop").addEventListener("click", openPicker);
+    picker.addEventListener("change", (e) => importer.importFiles(e.target.files));
+
+    document.querySelectorAll(".mode").forEach((b) =>
+      b.addEventListener("click", () => setMode(b.dataset.mode)));
+
+    bindFrameControls();
+    bindCropControls();
+    bindCollageControls();
+    bindCarouselControls();
+    cropMode.bind();
+    collageMode.bind();
+    carouselMode.bind();
+
+    // Persist last-used settings on any control interaction (debounced).
+    ["sheetFrame", "sheetCollage", "sheetCarousel"].forEach((id) => {
+      const el = document.getElementById(id);
+      el.addEventListener("input", () => persistence.scheduleSave());
+      el.addEventListener("click", () => persistence.scheduleSave());
+    });
+
+    // Drag & drop (desktop / Android with file DnD).
+    ["dragenter", "dragover"].forEach((ev) =>
+      workspace.addEventListener(ev, (e) => { e.preventDefault(); empty.classList.add("drag"); }));
+    ["dragleave", "drop"].forEach((ev) =>
+      workspace.addEventListener(ev, (e) => { e.preventDefault(); empty.classList.remove("drag"); }));
+    workspace.addEventListener("drop", (e) => {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length)
+        importer.importFiles(e.dataTransfer.files);
+    });
+
+    // Re-fit preview on viewport / orientation change (debounced).
+    let rt = null;
+    window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => renderer.draw(), 80); });
+  }
+
+  return { applyStrings, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets };
+})();
+
+/* ===========================================================================
+ * persistence — last-used settings + named presets in localStorage. Tolerates
+ * absent/blocked storage (private mode) by no-opping. Presets capture the frame
+ * + export profile (e.g. "IG 4:5 putih").
+ * ======================================================================== */
+const persistence = (function () {
+  const SETTINGS = "bingkai.settings.v1";
+  const PRESETS = "bingkai.presets.v1";
+  function safeGet(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }
+  function safeSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (_) { return false; } }
+
+  function snapshot() {
+    const f = state.frame, o = state.exportOpt, co = state.collage, c = state.carousel;
+    return {
+      frame: { ratio: f.ratio, marginPct: f.marginPct, frameColor: f.frameColor, bg: f.bg, blurStrength: f.blurStrength },
+      exportOpt: { ig: o.ig, quality: o.quality, format: o.format },
+      collage: { rows: co.rows, cols: co.cols, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor },
+      carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill },
+    };
+  }
+  function applySnapshot(s) {
+    if (!s) return;
+    Object.assign(state.frame, s.frame || {});
+    Object.assign(state.exportOpt, s.exportOpt || {});
+    Object.assign(state.collage, s.collage || {});
+    Object.assign(state.carousel, s.carousel || {});
+  }
+
+  let saveT = null;
+  function scheduleSave() {
+    clearTimeout(saveT);
+    saveT = setTimeout(() => safeSet(SETTINGS, JSON.stringify(snapshot())), 400);
+  }
+  function loadSettings() {
+    const r = safeGet(SETTINGS);
+    if (r) { try { applySnapshot(JSON.parse(r)); } catch (_) {} }
+  }
+
+  function listPresets() {
+    const r = safeGet(PRESETS);
+    if (!r) return [];
+    try { return JSON.parse(r) || []; } catch (_) { return []; }
+  }
+  function savePreset(name) {
+    const ps = listPresets(), snap = snapshot();
+    const entry = { name, frame: snap.frame, exportOpt: snap.exportOpt };
+    const i = ps.findIndex((p) => p.name === name);
+    if (i >= 0) ps[i] = entry; else ps.push(entry);
+    safeSet(PRESETS, JSON.stringify(ps));
+    return ps;
+  }
+  function deletePreset(name) {
+    const ps = listPresets().filter((p) => p.name !== name);
+    safeSet(PRESETS, JSON.stringify(ps));
+    return ps;
+  }
+  function applyPreset(name) {
+    const p = listPresets().find((x) => x.name === name);
+    if (!p) return false;
+    Object.assign(state.frame, p.frame || {});
+    Object.assign(state.exportOpt, p.exportOpt || {});
+    return true;
+  }
+
+  return { safeGet, safeSet, scheduleSave, loadSettings, snapshot, listPresets, savePreset, deletePreset, applyPreset };
+})();
+
+/* ===========================================================================
+ * pwa — inline manifest (data URI, inline SVG icon), service worker, install.
+ * ======================================================================== */
+const pwa = (function () {
+  const ICON = "data:image/svg+xml," + encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>" +
+    "<rect width='512' height='512' rx='96' fill='#1C1C1C'/>" +
+    "<rect x='120' y='120' width='272' height='272' rx='28' fill='none' stroke='#4A9EFF' stroke-width='30'/>" +
+    "<rect x='196' y='196' width='120' height='120' rx='14' fill='#C8A96E'/></svg>");
+
+  function installManifest() {
+    const manifest = {
+      name: "Studio Foto — Bingkai", short_name: "Bingkai",
+      start_url: ".", scope: ".", display: "standalone",
+      background_color: "#1C1C1C", theme_color: "#2A2A2A", lang: "id",
+      icons: [
+        { src: ICON, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+        { src: ICON, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" },
+      ],
+    };
+    const link = document.createElement("link");
+    link.rel = "manifest";
+    link.href = "data:application/manifest+json," + encodeURIComponent(JSON.stringify(manifest));
+    document.head.appendChild(link);
+    const al = document.createElement("link");
+    al.rel = "apple-touch-icon"; al.href = ICON; document.head.appendChild(al);
+    const fav = document.createElement("link");
+    fav.rel = "icon"; fav.type = "image/svg+xml"; fav.href = ICON; document.head.appendChild(fav);
+  }
+
+  function registerSW() {
+    if (!("serviceWorker" in navigator)) return;
+    if (!/^https?:$/.test(location.protocol)) return; // SW needs http(s)/localhost
+    navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("SW register failed", e));
+  }
+
+  let deferred = null;
+  function wireInstall() {
+    const btn = document.getElementById("btnInstall");
+    window.addEventListener("beforeinstallprompt", (e) => {
+      e.preventDefault(); deferred = e; btn.style.display = "inline-flex";
+    });
+    btn.addEventListener("click", async () => {
+      if (!deferred) return;
+      deferred.prompt(); await deferred.userChoice; deferred = null; btn.style.display = "none";
+    });
+    window.addEventListener("appinstalled", () => { btn.style.display = "none"; });
+  }
+
+  return { installManifest, registerSW, wireInstall };
+})();
+
+/* ===========================================================================
+ * boot
+ * ======================================================================== */
+function boot() {
+  persistence.loadSettings();   // restore last-used settings before wiring UI
+  ui.applyStrings();
+  ui.bind();
+  ui.syncFrameControlsFromState();
+  ui.renderPresets();
+  ui.setMode("frame");
+  ui.refreshEmpty();
+  renderer.clear();
+  pwa.installManifest();
+  pwa.wireInstall();
+  pwa.registerSW();
+}
+document.addEventListener("DOMContentLoaded", boot);
+
+// Expose a tiny hook so Playwright can drive imports without a real file dialog.
+window.__app = { state, importer, renderer, ui, exporter, compositor, cropMode, collageMode, carouselMode, persistence, geometryCore, CONFIG };
+</script>
+</body>
+</html>
