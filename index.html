@@ -167,8 +167,11 @@
     transform: translateY(-65%) rotate(45deg); transition: transform .18s ease; opacity: .8;
   }
   body.sheets-collapsed .sheet-handle::after { transform: translateY(-35%) rotate(-135deg); }
-  body.sheets-collapsed .sheet { display: none !important; }
-  body.sheets-collapsed .filmstrip { display: none !important; }
+  .dock-body {
+    overflow: hidden; max-height: 56vh; opacity: 1;
+    transition: max-height .26s cubic-bezier(.4,0,.2,1), opacity .18s ease;
+  }
+  body.sheets-collapsed .dock-body { max-height: 0; opacity: 0; }
 
   /* ===== control sheet (per-mode) ===== */
   .sheet {
@@ -230,7 +233,7 @@
     padding: 7px 14px; cursor: pointer; border-radius: 9px; transition: background .14s ease, color .14s ease;
   }
   .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-soft); }
-  .export-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+  .export-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; flex-wrap: wrap; }
   .export-row .btn-primary { flex: 1; padding: 14px; font-size: 15px; }
   .note { font-size: 11px; color: var(--txt-dim); line-height: 1.5; margin-top: 9px; }
   .note.warn { color: #E0B055; }
@@ -300,6 +303,7 @@
   <div class="sheet-handle hidden" id="sheetHandle">
     <span class="grip"></span>
   </div>
+  <div class="dock-body" id="dockBody">
   <div class="filmstrip hidden" id="filmstrip"></div>
 
   <div class="sheet hidden" id="sheetFrame">
@@ -374,7 +378,8 @@
 
     <div class="export-row">
       <button class="btn-primary" id="btnExport">Ekspor</button>
-      <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Ekspor semua</button>
+      <button class="chip ghost" id="btnSave" style="padding:13px 16px">Simpan</button>
+      <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Semua</button>
     </div>
     <div class="note" id="exportNote"></div>
 
@@ -397,8 +402,12 @@
         <button class="chip" data-ratio="original" id="cropChipOriginal">Asli</button>
       </div>
     </div>
-    <div class="row" id="cropOrientRow" style="display:none">
-      <button class="icon-toggle" id="btnCropOrient" type="button">
+    <div class="row" id="cropToolsRow" style="display:flex; gap:9px; flex-wrap:wrap">
+      <button class="icon-toggle" id="btnCropRotate" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a9 9 0 0 1 15-3l3 3"/><path d="M21 3v6h-6"/></svg>
+        <span>Putar 90°</span>
+      </button>
+      <button class="icon-toggle" id="btnCropOrient" type="button" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a9 9 0 0 0-15-3L3 8"/><path d="M3 3v5h5"/><path d="M3 16a9 9 0 0 0 15 3l3-3"/><path d="M21 21v-5h-5"/></svg>
         <span id="cropOrientLabel">Potret</span>
       </button>
@@ -406,6 +415,7 @@
     <div class="export-row">
       <button class="chip ghost" id="btnCropReset" style="padding:13px 16px">Atur ulang</button>
       <button class="btn-primary" id="btnCropExport">Ekspor</button>
+      <button class="chip ghost" id="btnCropSave" style="padding:13px 16px">Simpan</button>
     </div>
     <div class="note" id="cropExportNote"></div>
   </div>
@@ -456,6 +466,7 @@
     <div class="note" id="collageHint"></div>
     <div class="export-row">
       <button class="btn-primary" id="btnCollageExport">Ekspor</button>
+      <button class="chip ghost" id="btnCollageSave" style="padding:13px 16px">Simpan</button>
     </div>
   </div>
 
@@ -483,12 +494,21 @@
         <button data-fill="fit" id="fillFit">Muat</button>
       </div>
     </div>
+    <div class="row" id="carouselAdjustRow">
+      <div class="lab"><span id="labAdjust">Interaksi</span></div>
+      <div class="seg" id="adjustSeg">
+        <button data-adj="move" aria-pressed="true" id="adjMove">Atur posisi</button>
+        <button data-adj="browse" id="adjBrowse">Pratinjau tile</button>
+      </div>
+    </div>
     <div class="note" id="carouselHint"></div>
     <div class="export-row">
       <button class="btn-primary" id="btnCarouselExport">Ekspor</button>
+      <button class="chip ghost" id="btnCarouselSave" style="padding:13px 16px">Simpan</button>
     </div>
     <div class="note" id="carouselNote"></div>
   </div>
+  </div><!-- /dock-body -->
   </div><!-- /dock -->
   </div><!-- /stage-wrap -->
 
@@ -555,6 +575,8 @@ const STRINGS = {
   tiles: "Jumlah tile", tileRatio: "Rasio tile", fill: "Pengisian",
   fillCover: "Penuh (cover)", fillFit: "Muat (fit)",
   carouselHint: "Geser \u2194 pratinjau tile \u00b7 geser \u2195 atur posisi \u00b7 cubit untuk zoom",
+  carouselHintMove: "Seret untuk atur posisi \u00b7 cubit untuk zoom",
+  carouselHintBrowse: "Geser \u2194 pratinjau tile \u00b7 geser \u2195 atur posisi \u00b7 cubit zoom",
   carouselNote: "Mengekspor N gambar 1080px (seamless_01..) dalam urutan unggah. Tepi tiap tile sama persis 1080px agar IG tidak menggeser jahitan.",
   sharedN: "Dibagikan lewat lembar berbagi.",
   zipped: "ZIP tersimpan ke Unduhan.",
@@ -709,6 +731,11 @@ const geometryCore = (function () {
     return { cells, colW, rowH, outerMargin: M, gutter: G };
   }
 
+  function rotatedDims(w, h, deg) {
+    const d = ((deg % 360) + 360) % 360;
+    return (d === 90 || d === 270) ? { w: h, h: w } : { w, h };
+  }
+
   function templateRects({ Cw, Ch, cells, outerMargin = 0, gutter = 0 }) {
     if (!Array.isArray(cells) || !cells.length) throw new RangeError('template: cells required');
     const M = outerMargin, half = gutter / 2, eps = 1e-4;
@@ -731,7 +758,7 @@ const geometryCore = (function () {
     computeContainRect, computeCoverRect, computeFillRect, computeFrameLayout,
     maxAspectBox, clampCropBox, computeCropBoxLocked, cropZoomAboutPoint,
     computeCarouselComposite, computeCarouselBoundaries, carouselTiles, carouselFilenames,
-    computeCollageLayout, templateRects,
+    computeCollageLayout, templateRects, rotatedDims,
   };
 })();
 
@@ -780,6 +807,7 @@ const state = {
     n: 3,                // number of tiles (2..10)
     tileRatio: "4:5",    // each posted tile's aspect
     fill: "cover",       // 'cover' | 'fit'
+    adjust: "move",      // 'move' = drag repositions image (both axes); 'browse' = drag scrolls tiles
     pos: 0,              // preview scroll position in tile units
     zoom: 1,             // image zoom within the composite (cover only)
     cx: 0.5, cy: 0.5,    // image position within the composite (source fractions)
@@ -884,7 +912,35 @@ const importer = (function () {
     bumpIdSeq(n);
   }
 
-  return { importFiles, makeWorkingBitmap, disposeSource, restoreSource };
+  // Rotate the working bitmap to an absolute 90° step (0/90/180/270), keeping
+  // the original around so rotation stays lossless and reversible. All modes
+  // read src.bitmap/src.w/src.h, so they pick up the new orientation for free.
+  async function applyRotation(src, deg) {
+    if (!src) return;
+    const d = (((deg | 0) % 360) + 360) % 360;
+    if (!src.origBitmap) { src.origBitmap = src.bitmap; src.origW = src.w; src.origH = src.h; }
+    const closeCur = () => { if (src.bitmap && src.bitmap !== src.origBitmap) { try { src.bitmap.close(); } catch (_) {} } };
+    if (d === 0) {
+      closeCur();
+      src.bitmap = src.origBitmap; src.w = src.origW; src.h = src.origH;
+    } else {
+      const dims = geometryCore.rotatedDims(src.origW, src.origH, d);
+      const cv = document.createElement("canvas");
+      cv.width = dims.w; cv.height = dims.h;
+      const ctx = cv.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.translate(dims.w / 2, dims.h / 2);
+      ctx.rotate((d * Math.PI) / 180);
+      ctx.drawImage(src.origBitmap, -src.origW / 2, -src.origH / 2, src.origW, src.origH);
+      const rb = await createImageBitmap(cv);
+      closeCur();
+      src.bitmap = rb; src.w = dims.w; src.h = dims.h;
+    }
+    try { if (src.thumbUrl) URL.revokeObjectURL(src.thumbUrl); } catch (_) {}
+    src.thumbUrl = await makeThumbUrl(src.bitmap, src.w, src.h);
+  }
+
+  return { importFiles, makeWorkingBitmap, disposeSource, restoreSource, applyRotation };
 })();
 
 /* ===========================================================================
@@ -1102,10 +1158,13 @@ const exporter = (function () {
     setTimeout(() => URL.revokeObjectURL(url), 4000);
   }
 
+  let _forceDownload = false; // when true, skip the share sheet and save to device
+
   async function deliver(blob, filename) {
     const file = new File([blob], filename, { type: blob.type });
-    // Prefer the native share sheet on Android (lets user pick IG directly).
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    // Prefer the native share sheet on Android (lets user pick IG directly)
+    // unless the user explicitly chose "save to device".
+    if (!_forceDownload && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file] }); ui.toast(STRINGS.shared); return; }
       catch (e) { if (e && e.name === "AbortError") return; /* fall through to download */ }
     }
@@ -1132,7 +1191,7 @@ const exporter = (function () {
 
   // Multi-file delivery for carousel: share files[] → ZIP (JSZip) → per-file.
   async function deliverMany(files) {
-    if (navigator.canShare && navigator.canShare({ files })) {
+    if (!_forceDownload && navigator.canShare && navigator.canShare({ files })) {
       try { await navigator.share({ files }); ui.toast(STRINGS.sharedN); return; }
       catch (e) { if (e && e.name === "AbortError") return; }
     }
@@ -1245,7 +1304,12 @@ const exporter = (function () {
     }
   }
 
-  return { run, runBatch, batchFiles, deliverMany, triggerDownload };
+  // Run any export action with the share sheet suppressed (save to device).
+  async function withDownload(fn) { _forceDownload = true; try { return await fn(); } finally { _forceDownload = false; } }
+  async function save() { return withDownload(run); }
+  async function saveBatch() { return withDownload(runBatch); }
+
+  return { run, runBatch, batchFiles, save, saveBatch, withDownload, deliverMany, triggerDownload };
 })();
 
 
@@ -1266,8 +1330,9 @@ const cropMode = (function () {
   function cur() {
     const src = renderer.activeSource();
     if (!src) return null;
-    if (!src.crop) src.crop = { ratio: "original", zoom: 1, cx: 0.5, cy: 0.5, flip: false };
+    if (!src.crop) src.crop = { ratio: "original", zoom: 1, cx: 0.5, cy: 0.5, flip: false, rotate: 0 };
     if (src.crop.flip === undefined) src.crop.flip = false;
+    if (src.crop.rotate === undefined) src.crop.rotate = 0;
     return src.crop;
   }
 
@@ -1322,10 +1387,20 @@ const cropMode = (function () {
     c.cy = (box.y + box.h / 2) / H;
   }
 
-  function reset() {
-    const c = cur();
+  async function rotate90() {
+    const src = renderer.activeSource(); const c = cur();
+    if (!src || !c) return;
+    c.rotate = ((c.rotate || 0) + 90) % 360;
+    c.zoom = 1; c.cx = 0.5; c.cy = 0.5; // re-frame after the orientation change
+    await importer.applyRotation(src, c.rotate);
+    await applyChange();
+  }
+
+  async function reset() {
+    const src = renderer.activeSource(); const c = cur();
     c.ratio = "original"; c.zoom = 1; c.cx = 0.5; c.cy = 0.5; c.flip = false;
-    applyChange();
+    if (c.rotate) { c.rotate = 0; await importer.applyRotation(src, 0); }
+    await applyChange();
   }
 
   function onDown(e) {
@@ -1442,7 +1517,7 @@ const cropMode = (function () {
     return { box: boxFor(src.w, src.h), ratio: ratioNums() };
   }
 
-  return { bind, reset, drawPreview, exportBox, ratioNums, cur, applyChange, canFlip };
+  return { bind, reset, drawPreview, exportBox, ratioNums, cur, applyChange, canFlip, rotate90 };
 })();
 
 /* Asymmetric collage layouts (fractional cells in the inner area). These are
@@ -1873,19 +1948,25 @@ const carouselMode = (function () {
       return;
     }
     if (!drag) return;
-    // lock axis on first significant movement
-    if (!drag.axis) {
-      if (Math.abs(dx) > Math.abs(dy) + 2) drag.axis = "browse";
-      else if (Math.abs(dy) > Math.abs(dx) + 2) drag.axis = "position";
-    }
-    if (drag.axis === "position" && c.fill === "cover" && eff) {
-      // vertical drag repositions the image (content follows finger)
+    if (c.adjust !== "browse" && c.fill === "cover" && eff) {
+      // free reposition: the image follows the finger in both axes
       const box = mapping(eff, Wc, Hc).box;
+      c.cx -= (dx * ((box.w / N) / m.dispW)) / eff.w;
       c.cy -= (dy * (box.h / m.dispH)) / eff.h;
       syncPosition(eff, Wc, Hc);
     } else {
-      // horizontal browse
-      c.pos = geometryCore.clamp(c.pos - dx / m.pitch, 0, N - 1);
+      // browse mode: lock axis — horizontal scrolls tiles, vertical repositions
+      if (!drag.axis) {
+        if (Math.abs(dx) > Math.abs(dy) + 2) drag.axis = "browse";
+        else if (Math.abs(dy) > Math.abs(dx) + 2) drag.axis = "position";
+      }
+      if (drag.axis === "position" && c.fill === "cover" && eff) {
+        const box = mapping(eff, Wc, Hc).box;
+        c.cy -= (dy * (box.h / m.dispH)) / eff.h;
+        syncPosition(eff, Wc, Hc);
+      } else {
+        c.pos = geometryCore.clamp(c.pos - dx / m.pitch, 0, N - 1);
+      }
     }
     renderer.draw();
   }
@@ -1993,7 +2074,8 @@ const ui = (function () {
     document.getElementById("labFill").textContent = STRINGS.fill;
     document.getElementById("fillCover").textContent = STRINGS.fillCover;
     document.getElementById("fillFit").textContent = STRINGS.fillFit;
-    document.getElementById("carouselHint").textContent = STRINGS.carouselHint;
+    document.getElementById("carouselHint").textContent =
+      (state.carousel.adjust === "browse") ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
     document.getElementById("carouselNote").textContent = STRINGS.carouselNote;
     document.getElementById("btnCarouselExport").textContent = STRINGS.exportBtn;
     document.getElementById("tilesMinus").textContent = "\u2212";
@@ -2163,6 +2245,7 @@ const ui = (function () {
     // Export
     document.getElementById("btnUndo").addEventListener("click", () => undo.pop());
     document.getElementById("btnExport").addEventListener("click", () => exporter.run());
+    document.getElementById("btnSave").addEventListener("click", () => exporter.save());
     document.getElementById("btnExportAll").addEventListener("click", () => exporter.runBatch());
     // Blur strength
     const br = document.getElementById("blurRange");
@@ -2188,9 +2271,9 @@ const ui = (function () {
     const cr = src && src.crop ? src.crop : null;
     const ratio = cr ? cr.ratio : "original";
     pressGroup("#cropRatioChips .chip", "ratio", ratio);
-    const row = document.getElementById("cropOrientRow");
+    const btn = document.getElementById("btnCropOrient");
     const can = cropMode.canFlip();
-    row.style.display = can ? "block" : "none";
+    btn.style.display = can ? "inline-flex" : "none";
     if (can) {
       const n = cropMode.ratioNums();
       document.getElementById("cropOrientLabel").textContent = n.w < n.h ? "Potret" : "Lanskap";
@@ -2220,8 +2303,15 @@ const ui = (function () {
       syncCropControls();
       undo.commit();
     });
+    document.getElementById("btnCropRotate").addEventListener("click", async () => {
+      undo.begin();
+      await cropMode.rotate90();
+      syncCropControls();
+      undo.commit();
+    });
     document.getElementById("btnCropReset").addEventListener("click", () => { undo.begin(); cropMode.reset(); syncCropControls(); undo.commit(); });
     document.getElementById("btnCropExport").addEventListener("click", () => exporter.run());
+    document.getElementById("btnCropSave").addEventListener("click", () => exporter.save());
   }
 
   function syncCollageControls() {
@@ -2297,6 +2387,7 @@ const ui = (function () {
       renderer.draw();
     });
     document.getElementById("btnCollageExport").addEventListener("click", () => exporter.run());
+    document.getElementById("btnCollageSave").addEventListener("click", () => exporter.save());
   }
 
   function bindCarouselControls() {
@@ -2319,9 +2410,19 @@ const ui = (function () {
       b.addEventListener("click", () => {
         c.fill = b.dataset.fill;
         pressGroup("#fillSeg button", "fill", b.dataset.fill);
+        document.getElementById("adjustSeg").style.display = c.fill === "cover" ? "" : "none";
         renderer.draw();
       }));
+    document.querySelectorAll("#adjustSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        c.adjust = b.dataset.adj;
+        pressGroup("#adjustSeg button", "adj", b.dataset.adj);
+        document.getElementById("carouselHint").textContent =
+          c.adjust === "browse" ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
+        sessionStore.scheduleMeta();
+      }));
     document.getElementById("btnCarouselExport").addEventListener("click", () => carouselMode.exportTiles());
+    document.getElementById("btnCarouselSave").addEventListener("click", () => exporter.withDownload(() => carouselMode.exportTiles()));
   }
 
   function setBusy(on) { busy.classList.toggle("show", !!on); }
@@ -2428,7 +2529,15 @@ const ui = (function () {
     if (mode === "frame") { updateExportNote(); renderer.draw(); }
     else if (mode === "crop") { syncCropControls(); renderer.draw(); }
     else if (mode === "collage") { collageMode.ensureCells(); syncCollageControls(); renderer.draw(); }
-    else if (mode === "carousel") { state.carousel.pos = 0; renderer.draw(); }
+    else if (mode === "carousel") {
+      state.carousel.pos = 0;
+      pressGroup("#adjustSeg button", "adj", state.carousel.adjust);
+      pressGroup("#fillSeg button", "fill", state.carousel.fill);
+      document.getElementById("adjustSeg").style.display = state.carousel.fill === "cover" ? "" : "none";
+      document.getElementById("carouselHint").textContent =
+        (state.carousel.adjust === "browse") ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
+      renderer.draw();
+    }
     else toast(STRINGS.modeSoon);
     updateBatchBtn();
     sessionStore.scheduleMeta();
@@ -2450,8 +2559,12 @@ const ui = (function () {
     // Collapsible panel: hide the controls to enlarge the photo preview.
     document.getElementById("sheetHandle").addEventListener("click", () => {
       document.body.classList.toggle("sheets-collapsed");
-      // workspace resizes (flex), so re-fit the canvas
-      requestAnimationFrame(() => renderer.draw());
+      // re-fit the canvas across the height animation
+      const t0 = performance.now();
+      (function loop() {
+        renderer.draw();
+        if (performance.now() - t0 < 320) requestAnimationFrame(loop);
+      })();
     });
     cropMode.bind();
     collageMode.bind();
@@ -2736,7 +2849,7 @@ const sessionStore = (function () {
       mode: state.mode,
       crops,
       collage: { rows: co.rows, cols: co.cols, template: co.template, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor, cells: co.cells, selected: co.selected },
-      carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy },
+      carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill, adjust: c.adjust, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy },
     };
   }
   let mt = null;
@@ -2765,7 +2878,10 @@ const sessionStore = (function () {
     state.activeId = (meta.activeId && state.sources.some((s) => s.id === meta.activeId)) ? meta.activeId : state.sources[0].id;
     state.mode = meta.mode || "frame";
     // bake any crops so every mode shows the cropped image immediately
-    for (const s of state.sources) { if (s.crop) { try { await renderer.bakeCrop(s); } catch (_) {} } }
+    for (const s of state.sources) {
+      if (s.crop && s.crop.rotate) { try { await importer.applyRotation(s, s.crop.rotate); } catch (_) {} }
+      if (s.crop) { try { await renderer.bakeCrop(s); } catch (_) {} }
+    }
     return true;
   }
 
@@ -2815,6 +2931,7 @@ const undo = (function () {
     const byId = {}; s.crops.forEach((c) => { byId[c.id] = c.crop; });
     for (const src of state.sources) {
       src.crop = Object.prototype.hasOwnProperty.call(byId, src.id) ? byId[src.id] : src.crop;
+      try { await importer.applyRotation(src, (src.crop && src.crop.rotate) || 0); } catch (_) {}
       try { await renderer.bakeCrop(src); } catch (_) {}
     }
     await ui.applyRestoredState();
