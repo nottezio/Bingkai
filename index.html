@@ -57,14 +57,15 @@
     transition: background .12s ease;
   }
   .icon-btn:active { background: rgba(255,255,255,.12); }
+  .icon-btn:disabled { opacity: .32; pointer-events: none; }
   .icon-btn svg { width: 20px; height: 20px; }
 
-  /* ===== stage (photo area) + floating dock live here ===== */
-  .stage-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
+  /* ===== stage (photo area) sits ABOVE the control dock (non-overlapping) ===== */
+  .stage-wrap { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
 
   /* ===== workspace ===== */
   .workspace {
-    position: absolute; inset: 0;
+    position: relative; flex: 1 1 auto; min-height: 0;
     display: flex; align-items: center; justify-content: center;
     background:
       radial-gradient(120% 80% at 50% 0%, rgba(76,157,255,.05), transparent 60%),
@@ -104,16 +105,16 @@
     animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ===== floating frosted dock (filmstrip + handle + controls) ===== */
+  /* ===== control dock (standard bottom sheet: filmstrip + handle + controls) ===== */
   .dock {
-    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+    flex: 0 0 auto; z-index: 4;
     display: flex; flex-direction: column;
     background: var(--glass);
     -webkit-backdrop-filter: blur(22px) saturate(1.4);
     backdrop-filter: blur(22px) saturate(1.4);
     border-top: 1px solid var(--hair);
-    border-radius: 20px 20px 0 0;
-    box-shadow: 0 -10px 30px rgba(0,0,0,.34);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -8px 26px rgba(0,0,0,.34);
   }
   .dock.hidden { display: none; }
 
@@ -140,21 +141,38 @@
     display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--line);
     color: var(--txt-dim); font-size: 22px; background: rgba(255,255,255,.03);
   }
+  .crop-badge {
+    position: absolute; left: 2px; bottom: 2px; width: 17px; height: 17px; border-radius: 6px;
+    background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  }
+  .crop-badge svg { width: 11px; height: 11px; }
 
-  /* ===== collapsible sheet handle ===== */
+  /* ===== collapsible sheet handle (large tap target) ===== */
   .sheet-handle {
-    flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-    height: 22px; cursor: pointer; color: var(--txt-dim); user-select: none;
+    flex: 0 0 auto; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    height: 30px; cursor: pointer; color: var(--txt-dim); user-select: none;
   }
   .sheet-handle.hidden { display: none; }
-  .sheet-handle .grip { width: 38px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); transition: background .12s ease; }
-  .sheet-handle:active .grip { background: rgba(255,255,255,.4); }
-  .sheet-handle .chev { font-size: 10px; line-height: 1; opacity: .7; }
+  .sheet-handle .grip {
+    width: 52px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.28);
+    transition: background .12s ease, width .12s ease;
+  }
+  .sheet-handle:active .grip { background: rgba(255,255,255,.5); width: 60px; }
+  /* chevron hint to the right of the grip; points down (collapse) / up (expand) */
+  .sheet-handle::after {
+    content: ""; position: absolute; right: 18px; top: 50%;
+    width: 9px; height: 9px; border-right: 2px solid var(--txt-dim); border-bottom: 2px solid var(--txt-dim);
+    transform: translateY(-65%) rotate(45deg); transition: transform .18s ease; opacity: .8;
+  }
+  body.sheets-collapsed .sheet-handle::after { transform: translateY(-35%) rotate(-135deg); }
   body.sheets-collapsed .sheet { display: none !important; }
+  body.sheets-collapsed .filmstrip { display: none !important; }
 
   /* ===== control sheet (per-mode) ===== */
   .sheet {
-    flex: 0 1 auto; max-height: 42vh; overflow-y: auto;
+    flex: 0 1 auto; max-height: 38vh; overflow-y: auto;
     padding: 4px 16px calc(14px + var(--safe-b));
     -webkit-overflow-scrolling: touch;
   }
@@ -251,6 +269,9 @@
   <div class="topbar">
     <span class="title" id="appTitle">Studio Foto</span>
     <span class="spacer"></span>
+    <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
+    </button>
     <button class="icon-btn" id="btnInstall" style="display:none" aria-label="Pasang aplikasi">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 4 5-4M5 21h14"/></svg>
     </button>
@@ -276,11 +297,10 @@
   </div>
 
   <div class="dock hidden" id="dock">
-  <div class="filmstrip hidden" id="filmstrip"></div>
-
   <div class="sheet-handle hidden" id="sheetHandle">
-    <span class="grip"></span><span class="chev" id="sheetChev">&#9662;</span>
+    <span class="grip"></span>
   </div>
+  <div class="filmstrip hidden" id="filmstrip"></div>
 
   <div class="sheet hidden" id="sheetFrame">
     <div class="row">
@@ -294,6 +314,13 @@
         <button class="chip" data-ratio="3:2">3:2</button>
         <button class="chip" data-ratio="original" id="chipOriginal">Asli</button>
       </div>
+    </div>
+
+    <div class="row" id="frameOrientRow" style="display:none">
+      <button class="icon-toggle" id="btnFrameOrient" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a9 9 0 0 0-15-3L3 8"/><path d="M3 3v5h5"/><path d="M3 16a9 9 0 0 0 15 3l3-3"/><path d="M21 21v-5h-5"/></svg>
+        <span id="frameOrientLabel">Potret</span>
+      </button>
     </div>
 
     <div class="row">
@@ -347,6 +374,7 @@
 
     <div class="export-row">
       <button class="btn-primary" id="btnExport">Ekspor</button>
+      <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Ekspor semua</button>
     </div>
     <div class="note" id="exportNote"></div>
 
@@ -394,6 +422,10 @@
         <button class="chip" data-rows="2" data-cols="3">2×3</button>
         <button class="chip" data-rows="3" data-cols="2">3×2</button>
       </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labTemplate">Tata letak</span></div>
+      <div class="chips" id="templateChips"></div>
     </div>
     <div class="row">
       <div class="lab"><span id="labColRatio">Rasio</span></div>
@@ -677,12 +709,29 @@ const geometryCore = (function () {
     return { cells, colW, rowH, outerMargin: M, gutter: G };
   }
 
+  function templateRects({ Cw, Ch, cells, outerMargin = 0, gutter = 0 }) {
+    if (!Array.isArray(cells) || !cells.length) throw new RangeError('template: cells required');
+    const M = outerMargin, half = gutter / 2, eps = 1e-4;
+    const aw = Cw - 2 * M, ah = Ch - 2 * M;
+    if (aw < cells.length || ah < 1) throw new RangeError('template: area too small');
+    return cells.map((c) => {
+      const hasL = c.x > eps, hasT = c.y > eps;
+      const hasR = c.x + c.w < 1 - eps, hasB = c.y + c.h < 1 - eps;
+      const x0 = M + c.x * aw + (hasL ? half : 0);
+      const y0 = M + c.y * ah + (hasT ? half : 0);
+      const x1 = M + (c.x + c.w) * aw - (hasR ? half : 0);
+      const y1 = M + (c.y + c.h) * ah - (hasB ? half : 0);
+      const x = Math.round(x0), y = Math.round(y0);
+      return { x, y, w: Math.max(1, Math.round(x1) - x), h: Math.max(1, Math.round(y1) - y) };
+    });
+  }
+
   return {
     clamp, splitInteger, RATIO_PRESETS, parseRatio, canvasDimsForRatio,
     computeContainRect, computeCoverRect, computeFillRect, computeFrameLayout,
     maxAspectBox, clampCropBox, computeCropBoxLocked, cropZoomAboutPoint,
     computeCarouselComposite, computeCarouselBoundaries, carouselTiles, carouselFilenames,
-    computeCollageLayout,
+    computeCollageLayout, templateRects,
   };
 })();
 
@@ -706,6 +755,7 @@ const state = {
   work: null,         // { id, bitmap(downscaled), w, h } — current preview bitmap
   frame: {
     ratio: "4:5",
+    flip: false,        // landscape orientation for the chosen ratio
     marginPct: 4,
     frameColor: "#FFFFFF",
     bg: "solid",        // 'solid' | 'blur'
@@ -718,6 +768,7 @@ const state = {
   },
   collage: {
     rows: 2, cols: 2,
+    template: null,      // null = uniform rows×cols grid; else a template id
     ratio: "1:1",        // output canvas ratio
     gutterPct: 2,        // % of min(canvas edge)
     marginPct: 0,        // outer margin, % of min(canvas edge)
@@ -736,6 +787,7 @@ const state = {
 };
 let _idSeq = 0;
 const nextId = () => "src_" + (++_idSeq);
+const bumpIdSeq = (n) => { if (Number.isFinite(n) && n > _idSeq) _idSeq = n; };
 
 /* ===========================================================================
  * importer — decode with EXIF orientation baked in, build two-res assets.
@@ -796,7 +848,8 @@ const importer = (function () {
           const w = bitmap.width, h = bitmap.height; // already orientation-corrected
           const thumbUrl = await makeThumbUrl(bitmap, w, h);
           const id = nextId();
-          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl, crop: null, croppedBitmap: null, cropDims: null });
+          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl, blob: f, crop: null, croppedBitmap: null, cropDims: null });
+          sessionStore.putSource({ id, name: f.name || (id + ".jpg"), blob: f });
           if (!state.activeId) state.activeId = id;
           ok++;
         } catch (e) {
@@ -807,7 +860,7 @@ const importer = (function () {
     } finally {
       ui.setBusy(false);
     }
-    if (ok) { await renderer.useActive(); ui.refreshFilmstrip(); ui.refreshEmpty(); ui.updateExportNote(); if (state.mode === "collage") { collageMode.assignSources(); renderer.draw(); } }
+    if (ok) { await renderer.useActive(); ui.refreshFilmstrip(); ui.refreshEmpty(); ui.updateExportNote(); if (state.mode === "collage") { collageMode.assignSources(); renderer.draw(); } sessionStore.scheduleMeta(); }
     return ok;
   }
 
@@ -818,7 +871,20 @@ const importer = (function () {
     try { src.thumbUrl && URL.revokeObjectURL(src.thumbUrl); } catch (_) {}
   }
 
-  return { importFiles, makeWorkingBitmap, disposeSource };
+  // Recreate a source from a persisted record (keeps its original id + crop).
+  async function restoreSource(rec, crop) {
+    const bitmap = await decodeOriented(rec.blob);
+    const w = bitmap.width, h = bitmap.height;
+    const thumbUrl = await makeThumbUrl(bitmap, w, h);
+    state.sources.push({
+      id: rec.id, name: rec.name || (rec.id + ".jpg"), bitmap, w, h, thumbUrl,
+      blob: rec.blob, crop: crop || null, croppedBitmap: null, cropDims: null,
+    });
+    const n = parseInt(String(rec.id).replace(/^src_/, ""), 10);
+    bumpIdSeq(n);
+  }
+
+  return { importFiles, makeWorkingBitmap, disposeSource, restoreSource };
 })();
 
 /* ===========================================================================
@@ -864,7 +930,14 @@ const compositor = (function () {
     return geometryCore.canvasDimsForRatio(ratioW, ratioH, CONFIG.EXPORT_MAX);
   }
 
-  return { composeFrame, coverDraw, exportDims };
+  // Frame output ratio, honoring the orientation flip for non-square ratios.
+  function frameRatio(f, w, h) {
+    const r = geometryCore.parseRatio(f.ratio, w, h);
+    if (f.flip && f.ratio !== "original" && r.w !== r.h) return { w: r.h, h: r.w };
+    return r;
+  }
+
+  return { composeFrame, coverDraw, exportDims, frameRatio };
 })();
 
 
@@ -960,7 +1033,7 @@ const renderer = (function () {
     if (state.mode === "frame") {
       const f = state.frame;
       const eff = effective(src);
-      const r = geometryCore.parseRatio(f.ratio, eff.w, eff.h);
+      const r = compositor.frameRatio(f, eff.w, eff.h);
       // Preview shape uses a stable nominal size; only the ratio matters here.
       const shape = geometryCore.canvasDimsForRatio(r.w, r.h, 1200);
       const fit = geometryCore.computeContainRect(shape.Cw, shape.Ch, ws.clientWidth, ws.clientHeight);
@@ -1100,7 +1173,7 @@ const exporter = (function () {
     } else {
       const f = state.frame;
       const eff = renderer.effective(src);
-      const r = geometryCore.parseRatio(f.ratio, eff.w, eff.h);
+      const r = compositor.frameRatio(f, eff.w, eff.h);
       ({ Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig));
       ratioLabel = f.ratio;
       draw = (ctx) => compositor.composeFrame(ctx, eff.bitmap, eff.w, eff.h, Cw, Ch, f);
@@ -1130,7 +1203,49 @@ const exporter = (function () {
     }
   }
 
-  return { run, deliverMany, triggerDownload };
+  // Build one framed File per photo (used by runBatch; exposed for testing).
+  async function batchFiles() {
+    const f = state.frame, opt = state.exportOpt;
+    const type = opt.format === "png" ? "image/png" : "image/jpeg";
+    const quality = opt.format === "png" ? undefined : opt.quality;
+    const ext = opt.format === "png" ? "png" : "jpg";
+    const files = [];
+    let i = 0;
+    for (const src of state.sources) {
+      i++;
+      const eff = renderer.effective(src);
+      const r = compositor.frameRatio(f, eff.w, eff.h);
+      const { Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig);
+      const cv = document.createElement("canvas");
+      cv.width = Cw; cv.height = Ch;
+      const ctx = cv.getContext("2d", { alpha: opt.format === "png" });
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+      compositor.composeFrame(ctx, eff.bitmap, eff.w, eff.h, Cw, Ch, f);
+      const blob = await canvasToBlob(cv, type, quality);
+      const num = String(i).padStart(2, "0");
+      files.push(new File([blob], "bingkai_" + f.ratio.replace(":", "x") + "_" + num + "." + ext, { type: blob.type }));
+      cv.width = 0; cv.height = 0; // release each before the next
+    }
+    return files;
+  }
+
+  // Frame mode: export EVERY photo with the current frame settings, delivered
+  // together (share sheet → ZIP → per-file). Falls back to single export when
+  // there's only one photo.
+  async function runBatch() {
+    if (state.sources.length < 2) return run();
+    ui.setBusy(true);
+    try {
+      await deliverMany(await batchFiles());
+    } catch (e) {
+      console.error("batch export failed", e);
+      ui.toast(STRINGS.exportFail);
+    } finally {
+      ui.setBusy(false);
+    }
+  }
+
+  return { run, runBatch, batchFiles, deliverMany, triggerDownload };
 })();
 
 
@@ -1176,24 +1291,21 @@ const cropMode = (function () {
   async function applyChange() {
     await renderer.bakeCropActive();
     renderer.draw();
+    ui.refreshFilmstrip();
+    sessionStore.scheduleMeta();
   }
 
-  // The whole source image drawn (contained) on the stage, so the user can see
-  // what's being cropped OUT, not just the kept region.
-  function imageRect(wsW, wsH) {
-    const src = renderer.activeSource();
-    const pad = 12;
-    const fit = geometryCore.computeContainRect(src.w, src.h, wsW - 2 * pad, wsH - 2 * pad);
+  // The crop FRAME is fixed: the chosen aspect ratio, contained in the stage.
+  // The image pans/zooms underneath it (Instagram-style).
+  function frameRect(wsW, wsH) {
+    const r = ratioNums(), pad = 16;
+    const shape = geometryCore.canvasDimsForRatio(r.w, r.h, 1000);
+    const fit = geometryCore.computeContainRect(shape.Cw, shape.Ch, wsW - 2 * pad, wsH - 2 * pad);
     return { x: pad + fit.x, y: pad + fit.y, w: fit.w, h: fit.h };
   }
 
-  // Crop box (source px) mapped onto the on-screen image rectangle.
-  function selRect(imgR, box, src) {
-    return {
-      x: imgR.x + (box.x / src.w) * imgR.w, y: imgR.y + (box.y / src.h) * imgR.h,
-      w: (box.w / src.w) * imgR.w, h: (box.h / src.h) * imgR.h,
-    };
-  }
+  // On-screen scale that maps the source crop box onto the fixed frame.
+  function frameScale(fr, box) { return fr.w / box.w; }
 
   function boxFor(W, H) {
     const r = ratioNums(), c = cur();
@@ -1220,6 +1332,7 @@ const cropMode = (function () {
     if (state.mode !== "crop" || !renderer.activeSource()) return;
     stage.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) undo.begin();
     if (pointers.size === 2) pinchPrev = pinchDist();
   }
   function pinchDist() {
@@ -1240,21 +1353,23 @@ const cropMode = (function () {
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     const ws = document.getElementById("workspace");
-    const imgR = imageRect(ws.clientWidth, ws.clientHeight);
+    const fr = frameRect(ws.clientWidth, ws.clientHeight);
+    const box = boxFor(src.w, src.h);
+    const scale = frameScale(fr, box);
 
     if (pointers.size >= 2) {
       const d = pinchDist();
       if (pinchPrev > 0 && d > 0) {
-        const box = boxFor(src.w, src.h);
-        const sel = selRect(imgR, box, src);
         const mid = pinchMid();
         const sr = stage.getBoundingClientRect();
-        const fx = geometryCore.clamp((mid.x - sr.left - sel.x) / sel.w, 0, 1);
-        const fy = geometryCore.clamp((mid.y - sr.top - sel.y) / sel.h, 0, 1);
+        // focal point as a fraction of the fixed frame
+        const fx = geometryCore.clamp((mid.x - sr.left - fr.x) / fr.w, 0, 1);
+        const fy = geometryCore.clamp((mid.y - sr.top - fr.y) / fr.h, 0, 1);
         const r = ratioNums(); const c = cur();
         const z = geometryCore.cropZoomAboutPoint({
           sourceW: src.w, sourceH: src.h, ratioW: r.w, ratioH: r.h,
           zoom: c.zoom, centerX: c.cx * src.w, centerY: c.cy * src.h,
+          // Fixed frame: spreading fingers zooms the IMAGE in (smaller box ⇒ higher zoom).
           factor: d / pinchPrev, fx, fy,
         });
         c.zoom = z.zoom;
@@ -1264,10 +1379,11 @@ const cropMode = (function () {
       }
       pinchPrev = d;
     } else {
-      // drag moves the crop selection across the image
+      // Pan: the IMAGE follows the finger, so the source point under the frame
+      // centre moves opposite to the drag.
       const c = cur();
-      c.cx += dx / imgR.w;
-      c.cy += dy / imgR.h;
+      c.cx -= dx / (scale * src.w);
+      c.cy -= dy / (scale * src.h);
       syncCenterFrom(boxFor(src.w, src.h), src.w, src.h);
     }
     renderer.draw();
@@ -1277,7 +1393,8 @@ const cropMode = (function () {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinchPrev = 0;
     // bake the (possibly changed) crop so other modes see it
-    if (state.mode === "crop") renderer.bakeCropActive();
+    if (state.mode === "crop") { renderer.bakeCropActive().then(() => ui.refreshFilmstrip()); sessionStore.scheduleMeta(); }
+    if (pointers.size === 0) undo.commit();
   }
 
   function bind() {
@@ -1287,35 +1404,36 @@ const cropMode = (function () {
     stage.addEventListener("pointercancel", onUp);
   }
 
-  // Show the WHOLE image (dimmed) with the crop selection bright, so the user
-  // sees what will be cut. Drawn from full-res for sharpness.
+  // Fixed crop frame; the image is scaled/positioned so the export box maps onto
+  // the frame, with the surrounding image dimmed. Image moves/zooms under the frame.
   function drawPreview(ctx, wsW, wsH) {
     const src = renderer.activeSource();
     if (!src) return;
-    const imgR = imageRect(wsW, wsH);
+    const fr = frameRect(wsW, wsH);
     const box = boxFor(src.w, src.h);
-    const sel = selRect(imgR, box, src);
+    const scale = frameScale(fr, box);
+    const ix = fr.x - box.x * scale, iy = fr.y - box.y * scale;
+    const iw = src.w * scale, ih = src.h * scale;
 
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(src.bitmap, imgR.x, imgR.y, imgR.w, imgR.h);
-    // dim the whole image, then re-draw the selected region at full brightness
+    // whole image, then a dim veil over everything, then the frame re-lit
+    ctx.drawImage(src.bitmap, ix, iy, iw, ih);
     ctx.save();
-    ctx.beginPath(); ctx.rect(imgR.x, imgR.y, imgR.w, imgR.h); ctx.clip();
-    ctx.fillStyle = "rgba(0,0,0,.5)";
-    ctx.fillRect(imgR.x, imgR.y, imgR.w, imgR.h);
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    ctx.fillRect(0, 0, wsW, wsH);
     ctx.restore();
     ctx.save();
-    ctx.beginPath(); ctx.rect(sel.x, sel.y, sel.w, sel.h); ctx.clip();
-    ctx.drawImage(src.bitmap, imgR.x, imgR.y, imgR.w, imgR.h);
+    ctx.beginPath(); ctx.rect(fr.x, fr.y, fr.w, fr.h); ctx.clip();
+    ctx.drawImage(src.bitmap, ix, iy, iw, ih);
     ctx.restore();
-    // selection border + rule-of-thirds
+    // frame border + rule-of-thirds (on the fixed frame)
     ctx.strokeStyle = "rgba(255,255,255,.95)"; ctx.lineWidth = 2;
-    ctx.strokeRect(sel.x + 1, sel.y + 1, sel.w - 2, sel.h - 2);
+    ctx.strokeRect(fr.x + 1, fr.y + 1, fr.w - 2, fr.h - 2);
     ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 1;
     for (let i = 1; i < 3; i++) {
-      const gx = sel.x + (sel.w * i) / 3, gy = sel.y + (sel.h * i) / 3;
-      ctx.beginPath(); ctx.moveTo(gx, sel.y); ctx.lineTo(gx, sel.y + sel.h); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(sel.x, gy); ctx.lineTo(sel.x + sel.w, gy); ctx.stroke();
+      const gx = fr.x + (fr.w * i) / 3, gy = fr.y + (fr.h * i) / 3;
+      ctx.beginPath(); ctx.moveTo(gx, fr.y); ctx.lineTo(gx, fr.y + fr.h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fr.x, gy); ctx.lineTo(fr.x + fr.w, gy); ctx.stroke();
     }
   }
 
@@ -1326,6 +1444,26 @@ const cropMode = (function () {
 
   return { bind, reset, drawPreview, exportBox, ratioNums, cur, applyChange, canFlip };
 })();
+
+/* Asymmetric collage layouts (fractional cells in the inner area). These are
+ * the non-uniform "magazine" arrangements beyond a plain rows×cols grid. */
+const COLLAGE_TEMPLATES = [
+  { id: "big-2r", n: 3, label: "1+2", cells: [
+    { x: 0, y: 0, w: 0.62, h: 1 }, { x: 0.62, y: 0, w: 0.38, h: 0.5 }, { x: 0.62, y: 0.5, w: 0.38, h: 0.5 } ] },
+  { id: "2-big", n: 3, label: "2+1", cells: [
+    { x: 0, y: 0, w: 0.5, h: 0.4 }, { x: 0.5, y: 0, w: 0.5, h: 0.4 }, { x: 0, y: 0.4, w: 1, h: 0.6 } ] },
+  { id: "big-3r", n: 4, label: "1+3", cells: [
+    { x: 0, y: 0, w: 0.6, h: 1 },
+    { x: 0.6, y: 0, w: 0.4, h: 1 / 3 }, { x: 0.6, y: 1 / 3, w: 0.4, h: 1 / 3 }, { x: 0.6, y: 2 / 3, w: 0.4, h: 1 / 3 } ] },
+  { id: "wide-narrow", n: 2, label: "2:1", cells: [
+    { x: 0, y: 0, w: 0.64, h: 1 }, { x: 0.64, y: 0, w: 0.36, h: 1 } ] },
+  { id: "tri-121", n: 3, label: "1·2·1", cells: [
+    { x: 0, y: 0, w: 0.25, h: 1 }, { x: 0.25, y: 0, w: 0.5, h: 1 }, { x: 0.75, y: 0, w: 0.25, h: 1 } ] },
+  { id: "feat-3", n: 4, label: "Atas+3", cells: [
+    { x: 0, y: 0, w: 1, h: 0.6 },
+    { x: 0, y: 0.6, w: 1 / 3, h: 0.4 }, { x: 1 / 3, y: 0.6, w: 1 / 3, h: 0.4 }, { x: 2 / 3, y: 0.6, w: 1 / 3, h: 0.4 } ] },
+];
+function templateById(id) { return COLLAGE_TEMPLATES.find((t) => t.id === id) || null; }
 
 /* ===========================================================================
  * collageMode — grid compositing. Tiling comes from the P1-tested
@@ -1342,10 +1480,14 @@ const collageMode = (function () {
 
   function sourceFor(id) { return state.sources.find((s) => s.id === id) || null; }
 
-  // Rebuild the cell array to rows*cols, assigning sources in order (cycling),
+  function activeTemplate() { return state.collage.template ? templateById(state.collage.template) : null; }
+  // Number of cells: template length when a template is active, else rows×cols.
+  function cellCount() { const t = activeTemplate(); return t ? t.cells.length : state.collage.rows * state.collage.cols; }
+
+  // Rebuild the cell array to cellCount(), assigning sources in order (cycling),
   // preserving each cell's transform/source where still valid.
   function ensureCells() {
-    const co = state.collage, n = co.rows * co.cols, srcs = state.sources, cur = co.cells;
+    const co = state.collage, n = cellCount(), srcs = state.sources, cur = co.cells;
     const out = [];
     for (let i = 0; i < n; i++) {
       const prev = cur[i];
@@ -1377,6 +1519,11 @@ const collageMode = (function () {
     const co = state.collage, mn = Math.min(Cw, Ch);
     const m = Math.round((co.marginPct / 100) * mn);
     const g = Math.round((co.gutterPct / 100) * mn);
+    const t = activeTemplate();
+    if (t) {
+      try { return { cells: geometryCore.templateRects({ Cw, Ch, cells: t.cells, outerMargin: m, gutter: g }) }; }
+      catch (_) { return { cells: geometryCore.templateRects({ Cw, Ch, cells: t.cells, outerMargin: 0, gutter: 0 }) }; }
+    }
     try {
       return geometryCore.computeCollageLayout({ Cw, Ch, rows: co.rows, cols: co.cols, outerMargin: m, gutter: g });
     } catch (_) {
@@ -1479,6 +1626,7 @@ const collageMode = (function () {
     if (state.mode !== "collage" || !state.sources.length) return;
     stage.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) undo.begin();
     if (pointers.size === 2) { pinchPrev = pdist(); return; }
     const ws = document.getElementById("workspace");
     const sr = stage.getBoundingClientRect();
@@ -1561,6 +1709,8 @@ const collageMode = (function () {
     }
     hoverTarget = -1; gesture = null;
     if (state.mode === "collage") renderer.draw();
+    sessionStore.scheduleMeta();
+    if (pointers.size === 0) undo.commit();
   }
 
   function bind() {
@@ -1689,6 +1839,7 @@ const carouselMode = (function () {
     if (state.mode !== "carousel" || !renderer.activeSource()) return;
     stage.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 1) undo.begin();
     if (pointers.size === 2) pinchPrev = pdist();
     else drag = { lastX: e.clientX, lastY: e.clientY, axis: null };
   }
@@ -1742,6 +1893,8 @@ const carouselMode = (function () {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinchPrev = 0;
     if (drag) { drag = null; state.carousel.pos = Math.round(state.carousel.pos); renderer.draw(); }
+    sessionStore.scheduleMeta();
+    if (pointers.size === 0) undo.commit();
   }
   function bind() {
     stage.addEventListener("pointerdown", onDown);
@@ -1881,6 +2034,14 @@ const ui = (function () {
     document.getElementById("frameColorRow").style.display = state.frame.bg === "solid" ? "" : "none";
     document.getElementById("blurRow").style.display = state.frame.bg === "blur" ? "" : "none";
     document.getElementById("qualityRow").style.display = state.exportOpt.format === "jpeg" ? "" : "none";
+    // Orientation toggle only for non-square, non-original ratios.
+    const f = state.frame;
+    const canFlip = f.ratio !== "original" && f.ratio !== "1:1";
+    document.getElementById("frameOrientRow").style.display = canFlip ? "" : "none";
+    if (canFlip) {
+      const r = compositor.frameRatio(f, 1000, 1000); // dims irrelevant for preset ratios
+      document.getElementById("frameOrientLabel").textContent = r.w < r.h ? "Potret" : "Lanskap";
+    }
   }
 
   // Push current state into the frame-sheet controls (after preset/restore).
@@ -1932,10 +2093,24 @@ const ui = (function () {
     // Ratio chips
     document.querySelectorAll("#ratioChips .chip").forEach((c) =>
       c.addEventListener("click", () => {
+        undo.begin();
         state.frame.ratio = c.dataset.ratio;
+        state.frame.flip = false; // new ratio starts in its natural orientation
         pressGroup("#ratioChips .chip", "ratio", c.dataset.ratio);
+        syncFrameRows();
         renderer.draw(); updateExportNote();
+        undo.commit();
       }));
+    document.getElementById("btnFrameOrient").addEventListener("click", () => {
+      const f = state.frame;
+      if (f.ratio === "original" || f.ratio === "1:1") return;
+      undo.begin();
+      f.flip = !f.flip;
+      syncFrameRows();
+      renderer.draw(); updateExportNote();
+      persistence.scheduleSave();
+      undo.commit();
+    });
     // Margin
     const mr = document.getElementById("marginRange");
     mr.addEventListener("input", () => {
@@ -1986,7 +2161,9 @@ const ui = (function () {
         syncFrameRows(); updateExportNote();
       }));
     // Export
+    document.getElementById("btnUndo").addEventListener("click", () => undo.pop());
     document.getElementById("btnExport").addEventListener("click", () => exporter.run());
+    document.getElementById("btnExportAll").addEventListener("click", () => exporter.runBatch());
     // Blur strength
     const br = document.getElementById("blurRange");
     br.addEventListener("input", () => {
@@ -2025,34 +2202,68 @@ const ui = (function () {
       c.addEventListener("click", () => {
         const cr = cropMode.cur();
         if (!cr) return;
+        undo.begin();
         cr.ratio = c.dataset.ratio;
-        // re-clamp current centre into the new ratio's box, default orientation
         cr.zoom = 1; cr.cx = 0.5; cr.cy = 0.5; cr.flip = false;
         pressGroup("#cropRatioChips .chip", "ratio", c.dataset.ratio);
         cropMode.applyChange();
         syncCropControls();
+        undo.commit();
       }));
     document.getElementById("btnCropOrient").addEventListener("click", () => {
       const cr = cropMode.cur();
       if (!cr || !cropMode.canFlip()) return;
+      undo.begin();
       cr.flip = !cr.flip;
       cr.cx = 0.5; cr.cy = 0.5; // re-centre after the aspect swaps
       cropMode.applyChange();
       syncCropControls();
+      undo.commit();
     });
-    document.getElementById("btnCropReset").addEventListener("click", () => { cropMode.reset(); syncCropControls(); });
+    document.getElementById("btnCropReset").addEventListener("click", () => { undo.begin(); cropMode.reset(); syncCropControls(); undo.commit(); });
     document.getElementById("btnCropExport").addEventListener("click", () => exporter.run());
+  }
+
+  function syncCollageControls() {
+    const co = state.collage;
+    document.querySelectorAll("#gridChips .chip").forEach((x) =>
+      x.setAttribute("aria-pressed", String(!co.template && +x.dataset.rows === co.rows && +x.dataset.cols === co.cols)));
+    document.querySelectorAll("#templateChips .chip").forEach((x) =>
+      x.setAttribute("aria-pressed", String(co.template === x.dataset.tpl)));
+    pressGroup("#collageRatioChips .chip", "ratio", co.ratio);
   }
 
   function bindCollageControls() {
     const co = state.collage;
     document.querySelectorAll("#gridChips .chip").forEach((c) =>
       c.addEventListener("click", () => {
+        undo.begin();
+        co.template = null;
         co.rows = +c.dataset.rows; co.cols = +c.dataset.cols;
         document.querySelectorAll("#gridChips .chip").forEach((x) =>
           x.setAttribute("aria-pressed", String(x === c)));
+        document.querySelectorAll("#templateChips .chip").forEach((x) => x.setAttribute("aria-pressed", "false"));
         collageMode.assignSources(); renderer.draw();
+        sessionStore.scheduleMeta();
+        undo.commit();
       }));
+    // Build asymmetric layout templates.
+    const tWrap = document.getElementById("templateChips");
+    tWrap.innerHTML = "";
+    COLLAGE_TEMPLATES.forEach((t) => {
+      const b = document.createElement("button");
+      b.className = "chip ghost"; b.dataset.tpl = t.id; b.textContent = t.label;
+      b.addEventListener("click", () => {
+        undo.begin();
+        co.template = t.id;
+        document.querySelectorAll("#templateChips .chip").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        document.querySelectorAll("#gridChips .chip").forEach((x) => x.setAttribute("aria-pressed", "false"));
+        collageMode.assignSources(); renderer.draw();
+        sessionStore.scheduleMeta();
+        undo.commit();
+      });
+      tWrap.appendChild(b);
+    });
     document.querySelectorAll("#collageRatioChips .chip").forEach((c) =>
       c.addEventListener("click", () => {
         co.ratio = c.dataset.ratio;
@@ -2143,6 +2354,11 @@ const ui = (function () {
     document.getElementById("sheetHandle").classList.toggle("hidden", !has);
   }
 
+  function updateBatchBtn() {
+    const el = document.getElementById("btnExportAll");
+    if (el) el.style.display = (state.mode === "frame" && state.sources.length > 1) ? "" : "none";
+  }
+
   function refreshFilmstrip() {
     const has = state.sources.length > 0;
     filmstrip.classList.toggle("hidden", !has);
@@ -2153,6 +2369,12 @@ const ui = (function () {
       const img = document.createElement("img");
       img.src = s.thumbUrl; img.alt = s.name;
       t.appendChild(img);
+      if (s.croppedBitmap) {
+        const b = document.createElement("div");
+        b.className = "crop-badge"; b.title = "Sudah dipotong";
+        b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>';
+        t.appendChild(b);
+      }
       const x = document.createElement("div");
       x.className = "x"; x.textContent = "\u00d7";
       x.addEventListener("click", (ev) => { ev.stopPropagation(); removeSource(s.id); });
@@ -2164,6 +2386,7 @@ const ui = (function () {
     add.className = "thumb add"; add.textContent = "+";
     add.addEventListener("click", openPicker);
     filmstrip.appendChild(add);
+    updateBatchBtn();
   }
 
   async function setActive(id) {
@@ -2173,6 +2396,7 @@ const ui = (function () {
     refreshFilmstrip();
     updateExportNote();
     if (state.mode === "crop") syncCropControls();
+    sessionStore.scheduleMeta();
   }
 
   function removeSource(id) {
@@ -2180,9 +2404,11 @@ const ui = (function () {
     if (idx < 0) return;
     const [src] = state.sources.splice(idx, 1);
     importer.disposeSource(src);
+    sessionStore.delSource(id);
     if (state.activeId === id) {
       state.activeId = state.sources.length ? state.sources[Math.max(0, idx - 1)].id : null;
     }
+    if (!state.sources.length) sessionStore.clearAll(); else sessionStore.scheduleMeta();
     renderer.useActive().then(() => {
       refreshFilmstrip(); refreshEmpty();
       if (state.mode === "collage") { collageMode.assignSources(); renderer.draw(); }
@@ -2201,9 +2427,11 @@ const ui = (function () {
     document.getElementById("sheetCarousel").classList.toggle("hidden", mode !== "carousel");
     if (mode === "frame") { updateExportNote(); renderer.draw(); }
     else if (mode === "crop") { syncCropControls(); renderer.draw(); }
-    else if (mode === "collage") { collageMode.assignSources(); renderer.draw(); }
+    else if (mode === "collage") { collageMode.ensureCells(); syncCollageControls(); renderer.draw(); }
     else if (mode === "carousel") { state.carousel.pos = 0; renderer.draw(); }
     else toast(STRINGS.modeSoon);
+    updateBatchBtn();
+    sessionStore.scheduleMeta();
   }
 
   function bind() {
@@ -2219,10 +2447,10 @@ const ui = (function () {
     bindCollageControls();
     bindCarouselControls();
 
-    // Collapsible panel: hide the active sheet to enlarge the preview.
+    // Collapsible panel: hide the controls to enlarge the photo preview.
     document.getElementById("sheetHandle").addEventListener("click", () => {
-      const collapsed = document.body.classList.toggle("sheets-collapsed");
-      document.getElementById("sheetChev").innerHTML = collapsed ? "&#9652;" : "&#9662;";
+      document.body.classList.toggle("sheets-collapsed");
+      // workspace resizes (flex), so re-fit the canvas
       requestAnimationFrame(() => renderer.draw());
     });
     cropMode.bind();
@@ -2255,8 +2483,8 @@ const ui = (function () {
     // Persist last-used settings on any control interaction (debounced).
     ["sheetFrame", "sheetCollage", "sheetCarousel"].forEach((id) => {
       const el = document.getElementById(id);
-      el.addEventListener("input", () => persistence.scheduleSave());
-      el.addEventListener("click", () => persistence.scheduleSave());
+      el.addEventListener("input", () => { persistence.scheduleSave(); sessionStore.scheduleMeta(); });
+      el.addEventListener("click", () => { persistence.scheduleSave(); sessionStore.scheduleMeta(); });
     });
 
     // Drag & drop (desktop / Android with file DnD).
@@ -2274,7 +2502,23 @@ const ui = (function () {
     window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => renderer.draw(), 80); });
   }
 
-  return { applyStrings, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets };
+  function updateUndo() {
+    const b = document.getElementById("btnUndo");
+    if (b) b.disabled = !undo.canUndo();
+  }
+
+  // Re-sync all controls + canvas to the current state (used after an undo).
+  async function applyRestoredState() {
+    await renderer.useActive();
+    refreshFilmstrip();
+    syncFrameControlsFromState();
+    syncCropControls();
+    syncCollageControls();
+    setMode(state.mode);
+    updateExportNote();
+  }
+
+  return { applyStrings, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState };
 })();
 
 /* ===========================================================================
@@ -2291,7 +2535,7 @@ const persistence = (function () {
   function snapshot() {
     const f = state.frame, o = state.exportOpt, co = state.collage, c = state.carousel;
     return {
-      frame: { ratio: f.ratio, marginPct: f.marginPct, frameColor: f.frameColor, bg: f.bg, blurStrength: f.blurStrength },
+      frame: { ratio: f.ratio, flip: !!f.flip, marginPct: f.marginPct, frameColor: f.frameColor, bg: f.bg, blurStrength: f.blurStrength },
       exportOpt: { ig: o.ig, quality: o.quality, format: o.format },
       collage: { rows: co.rows, cols: co.cols, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor },
       carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill },
@@ -2419,23 +2663,198 @@ const pwa = (function () {
 /* ===========================================================================
  * boot
  * ======================================================================== */
-function boot() {
-  persistence.loadSettings();   // restore last-used settings before wiring UI
+/* ===========================================================================
+ * sessionStore — persists the working set (imported photos + their crops +
+ * collage cells + carousel position + active/mode) in IndexedDB so a reload
+ * restores exactly where you left off. Original file blobs are stored once;
+ * crops/edits live in a single debounced 'meta' record. Degrades silently if
+ * IndexedDB is unavailable.
+ * ======================================================================== */
+const sessionStore = (function () {
+  const DB = "bingkai-session", VER = 1;
+  let dbp = null;
+  function open() {
+    if (dbp) return dbp;
+    dbp = new Promise((res) => {
+      let r;
+      try { r = indexedDB.open(DB, VER); } catch (_) { return res(null); }
+      r.onupgradeneeded = () => {
+        const db = r.result;
+        if (!db.objectStoreNames.contains("sources")) db.createObjectStore("sources", { keyPath: "id" });
+        if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+      };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => res(null);
+    });
+    return dbp;
+  }
+  async function putSource(rec) {
+    const db = await open(); if (!db) return;
+    try { db.transaction("sources", "readwrite").objectStore("sources").put(rec); } catch (_) {}
+  }
+  async function delSource(id) {
+    const db = await open(); if (!db) return;
+    try { db.transaction("sources", "readwrite").objectStore("sources").delete(id); } catch (_) {}
+  }
+  async function allSources() {
+    const db = await open(); if (!db) return [];
+    return new Promise((res) => {
+      try {
+        const rq = db.transaction("sources", "readonly").objectStore("sources").getAll();
+        rq.onsuccess = () => res(rq.result || []); rq.onerror = () => res([]);
+      } catch (_) { res([]); }
+    });
+  }
+  async function getMeta() {
+    const db = await open(); if (!db) return null;
+    return new Promise((res) => {
+      try {
+        const rq = db.transaction("meta", "readonly").objectStore("meta").get("session");
+        rq.onsuccess = () => res(rq.result || null); rq.onerror = () => res(null);
+      } catch (_) { res(null); }
+    });
+  }
+  async function putMeta(m) {
+    const db = await open(); if (!db) return;
+    try { db.transaction("meta", "readwrite").objectStore("meta").put(m, "session"); } catch (_) {}
+  }
+  async function clearAll() {
+    const db = await open(); if (!db) return;
+    try {
+      db.transaction("sources", "readwrite").objectStore("sources").clear();
+      db.transaction("meta", "readwrite").objectStore("meta").clear();
+    } catch (_) {}
+  }
+
+  function buildMeta() {
+    const co = state.collage, c = state.carousel;
+    const crops = {};
+    state.sources.forEach((s) => { if (s.crop) crops[s.id] = s.crop; });
+    return {
+      order: state.sources.map((s) => s.id),
+      activeId: state.activeId,
+      mode: state.mode,
+      crops,
+      collage: { rows: co.rows, cols: co.cols, template: co.template, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor, cells: co.cells, selected: co.selected },
+      carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy },
+    };
+  }
+  let mt = null;
+  function scheduleMeta() {
+    clearTimeout(mt);
+    mt = setTimeout(() => { putMeta(buildMeta()); }, 350);
+  }
+
+  // Restore a previous session. Returns true if anything was restored.
+  async function restore() {
+    let recs = [];
+    try { recs = await allSources(); } catch (_) { recs = []; }
+    if (!recs.length) return false;
+    const meta = (await getMeta()) || {};
+    const order = meta.order && meta.order.length ? meta.order : recs.map((r) => r.id);
+    const byId = {}; recs.forEach((r) => { byId[r.id] = r; });
+    const crops = meta.crops || {};
+    for (const id of order) {
+      const rec = byId[id];
+      if (!rec) continue;
+      try { await importer.restoreSource(rec, crops[id] || null); } catch (e) { console.warn("restore source failed", id, e); }
+    }
+    if (!state.sources.length) return false;
+    if (meta.collage) Object.assign(state.collage, meta.collage);
+    if (meta.carousel) Object.assign(state.carousel, meta.carousel);
+    state.activeId = (meta.activeId && state.sources.some((s) => s.id === meta.activeId)) ? meta.activeId : state.sources[0].id;
+    state.mode = meta.mode || "frame";
+    // bake any crops so every mode shows the cropped image immediately
+    for (const s of state.sources) { if (s.crop) { try { await renderer.bakeCrop(s); } catch (_) {} } }
+    return true;
+  }
+
+  return { putSource, delSource, allSources, getMeta, putMeta, clearAll, scheduleMeta, restore };
+})();
+
+
+/* ===========================================================================
+ * undo — one snapshot stack of the edit-relevant state. begin() captures a
+ * pending snapshot at the start of an action; commit() pushes it only if the
+ * state actually changed. pop() restores. Covers crops, frame, collage,
+ * carousel, active photo + mode — the things easy to change by accident.
+ * ======================================================================== */
+const undo = (function () {
+  const MAX = 25;
+  const stack = [];
+  let pending = null;
+
+  function snap() {
+    return JSON.stringify({
+      mode: state.mode, activeId: state.activeId,
+      frame: state.frame, exportOpt: state.exportOpt,
+      collage: state.collage, carousel: state.carousel,
+      crops: state.sources.map((s) => ({ id: s.id, crop: s.crop })),
+    });
+  }
+  function begin() { pending = snap(); }
+  function commit() {
+    if (pending && pending !== snap()) {
+      stack.push(pending);
+      if (stack.length > MAX) stack.shift();
+      ui.updateUndo();
+    }
+    pending = null;
+  }
+  function canUndo() { return stack.length > 0; }
+
+  async function pop() {
+    if (!stack.length) return;
+    const s = JSON.parse(stack.pop());
+    state.mode = s.mode;
+    if (state.sources.some((x) => x.id === s.activeId)) state.activeId = s.activeId;
+    Object.assign(state.frame, s.frame);
+    Object.assign(state.exportOpt, s.exportOpt);
+    Object.assign(state.collage, s.collage);
+    Object.assign(state.carousel, s.carousel);
+    const byId = {}; s.crops.forEach((c) => { byId[c.id] = c.crop; });
+    for (const src of state.sources) {
+      src.crop = Object.prototype.hasOwnProperty.call(byId, src.id) ? byId[src.id] : src.crop;
+      try { await renderer.bakeCrop(src); } catch (_) {}
+    }
+    await ui.applyRestoredState();
+    ui.updateUndo();
+    sessionStore.scheduleMeta();
+  }
+
+  return { begin, commit, pop, canUndo };
+})();
+
+
+async function boot() {
+  persistence.loadSettings();   // restore last-used global settings before wiring UI
   ui.applyStrings();
   ui.bind();
   ui.syncFrameControlsFromState();
   ui.renderPresets();
-  ui.setMode("frame");
-  ui.refreshEmpty();
-  renderer.clear();
   pwa.installManifest();
   pwa.wireInstall();
   pwa.registerSW();
+
+  // Restore the previous working session (photos + crops + edits), if any.
+  let restored = false;
+  try { restored = await sessionStore.restore(); } catch (_) {}
+  if (restored) {
+    await renderer.useActive();
+    ui.refreshFilmstrip();
+    ui.refreshEmpty();
+    ui.setMode(state.mode || "frame");
+    ui.updateExportNote();
+  } else {
+    ui.setMode("frame");
+    ui.refreshEmpty();
+    renderer.clear();
+  }
 }
 document.addEventListener("DOMContentLoaded", boot);
 
 // Expose a tiny hook so Playwright can drive imports without a real file dialog.
-window.__app = { state, importer, renderer, ui, exporter, compositor, cropMode, collageMode, carouselMode, persistence, geometryCore, CONFIG };
+window.__app = { state, importer, renderer, ui, exporter, compositor, cropMode, collageMode, carouselMode, persistence, sessionStore, undo, geometryCore, CONFIG };
 </script>
 </body>
 </html>
