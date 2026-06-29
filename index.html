@@ -15,17 +15,23 @@
 <style>
   /* ===== design tokens ===== */
   :root {
-    --bg: #2A2A2A;          /* neutral mid-gray workspace backdrop */
-    --panel: #1C1C1C;       /* toolbar / chrome */
-    --panel-2: #242424;
-    --line: #383838;
-    --txt: #EDEDED;
-    --txt-dim: #9A9A9A;
-    --accent: #4A9EFF;
-    --accent-ink: #0B1F38;
+    --bg: #0E1014;          /* deep cool near-black behind the photo */
+    --ink: #14171C;         /* solid chrome (topbar/toolbar base) */
+    --glass: rgba(18,21,26,0.72);   /* frosted floating dock fill */
+    --glass-2: rgba(26,30,37,0.66);
+    --hair: rgba(255,255,255,0.10); /* top highlight hairline on glass */
+    --panel: #14171C;       /* legacy alias */
+    --panel-2: rgba(255,255,255,0.055);
+    --line: rgba(255,255,255,0.085);
+    --txt: #F4F5F7;
+    --txt-dim: #8B919C;
+    --accent: #4C9DFF;
+    --accent-soft: rgba(76,157,255,0.16);
+    --accent-ink: #06203F;
     --danger: #E5534B;
-    --toolbar-h: 64px;
+    --toolbar-h: 60px;
     --safe-b: env(safe-area-inset-bottom, 0px);
+    --radius: 13px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -38,30 +44,35 @@
 
   /* ===== top bar ===== */
   .topbar {
-    flex: 0 0 auto; height: 48px; display: flex; align-items: center;
-    gap: 10px; padding: 0 12px; background: var(--panel);
+    flex: 0 0 auto; height: 50px; display: flex; align-items: center;
+    gap: 10px; padding: 0 14px; background: var(--ink);
     border-bottom: 1px solid var(--line); padding-top: env(safe-area-inset-top, 0px);
   }
-  .topbar .title { font-size: 15px; font-weight: 600; letter-spacing: .2px; }
+  .topbar .title { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
   .topbar .spacer { flex: 1; }
   .icon-btn {
     display: inline-flex; align-items: center; justify-content: center;
-    width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--line);
+    width: 38px; height: 38px; border-radius: 11px; border: 1px solid var(--line);
     background: var(--panel-2); color: var(--txt); cursor: pointer;
+    transition: background .12s ease;
   }
-  .icon-btn:active { background: #2e2e2e; }
+  .icon-btn:active { background: rgba(255,255,255,.12); }
   .icon-btn svg { width: 20px; height: 20px; }
+
+  /* ===== stage (photo area) + floating dock live here ===== */
+  .stage-wrap { position: relative; flex: 1 1 auto; min-height: 0; }
 
   /* ===== workspace ===== */
   .workspace {
-    position: relative; flex: 1 1 auto; min-height: 0;
+    position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
     background:
-      radial-gradient(transparent 0, transparent 1px, rgba(255,255,255,.012) 1px) 0 0 / 22px 22px,
+      radial-gradient(120% 80% at 50% 0%, rgba(76,157,255,.05), transparent 60%),
       var(--bg);
     overflow: hidden;
   }
-  #stage { display: block; max-width: 100%; max-height: 100%; touch-action: none; }
+  #stage { display: block; max-width: 100%; max-height: 100%; touch-action: none;
+    filter: drop-shadow(0 12px 28px rgba(0,0,0,.45)); }
 
   /* empty state */
   .empty {
@@ -93,84 +104,144 @@
     animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ===== floating frosted dock (filmstrip + handle + controls) ===== */
+  .dock {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+    display: flex; flex-direction: column;
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(22px) saturate(1.4);
+    backdrop-filter: blur(22px) saturate(1.4);
+    border-top: 1px solid var(--hair);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -10px 30px rgba(0,0,0,.34);
+  }
+  .dock.hidden { display: none; }
+
   /* ===== filmstrip ===== */
   .filmstrip {
-    flex: 0 0 auto; display: flex; gap: 8px; padding: 8px 10px; overflow-x: auto;
-    background: var(--panel); border-top: 1px solid var(--line); scrollbar-width: none;
+    flex: 0 0 auto; display: flex; gap: 9px; padding: 11px 12px 7px; overflow-x: auto;
+    scrollbar-width: none;
   }
   .filmstrip::-webkit-scrollbar { display: none; }
   .filmstrip.hidden { display: none; }
   .thumb {
-    position: relative; flex: 0 0 auto; width: 52px; height: 52px; border-radius: 9px;
-    overflow: hidden; border: 2px solid transparent; background: #111; cursor: pointer;
+    position: relative; flex: 0 0 auto; width: 50px; height: 50px; border-radius: 11px;
+    overflow: hidden; border: 2px solid transparent; background: #0b0d10; cursor: pointer;
+    transition: transform .12s ease;
   }
-  .thumb.active { border-color: var(--accent); }
+  .thumb.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb .x {
-    position: absolute; top: 1px; right: 1px; width: 17px; height: 17px; border-radius: 50%;
-    background: rgba(0,0,0,.62); color: #fff; font-size: 12px; line-height: 17px; text-align: center;
+    position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%;
+    background: rgba(0,0,0,.66); color: #fff; font-size: 12px; line-height: 18px; text-align: center;
+    backdrop-filter: blur(4px);
   }
   .thumb.add {
     display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--line);
-    color: var(--txt-dim); font-size: 24px; background: var(--panel-2);
+    color: var(--txt-dim); font-size: 22px; background: rgba(255,255,255,.03);
   }
+
+  /* ===== collapsible sheet handle ===== */
+  .sheet-handle {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
+    height: 22px; cursor: pointer; color: var(--txt-dim); user-select: none;
+  }
+  .sheet-handle.hidden { display: none; }
+  .sheet-handle .grip { width: 38px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.22); transition: background .12s ease; }
+  .sheet-handle:active .grip { background: rgba(255,255,255,.4); }
+  .sheet-handle .chev { font-size: 10px; line-height: 1; opacity: .7; }
+  body.sheets-collapsed .sheet { display: none !important; }
+
+  /* ===== control sheet (per-mode) ===== */
+  .sheet {
+    flex: 0 1 auto; max-height: 42vh; overflow-y: auto;
+    padding: 4px 16px calc(14px + var(--safe-b));
+    -webkit-overflow-scrolling: touch;
+  }
+  .sheet.hidden { display: none; }
+  .row { margin: 13px 0; }
+  .row > .lab {
+    font-size: 10.5px; color: var(--txt-dim); margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+    text-transform: uppercase; letter-spacing: .07em; font-weight: 600;
+  }
+  .row > .lab > span:nth-child(2) { font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; color: var(--txt); font-weight: 600; }
+  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--txt);
+    font-size: 13px; font-weight: 550; padding: 8px 13px; border-radius: 11px; cursor: pointer; white-space: nowrap;
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
+  }
+  .chip:active { transform: scale(.97); }
+  .chip[aria-pressed="true"] { border-color: transparent; color: #fff; background: var(--accent); box-shadow: 0 2px 10px var(--accent-soft); }
+  .chip.ghost[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+
+  /* ===== range slider ===== */
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 5px; border-radius: 3px;
+    background: linear-gradient(var(--accent), var(--accent)) 0/var(--fill,50%) 100% no-repeat, rgba(255,255,255,.12);
+  }
+  input[type="range"]::-moz-range-track { height: 5px; border-radius: 3px; background: rgba(255,255,255,.12); }
+  input[type="range"]::-moz-range-progress { height: 5px; border-radius: 3px; background: var(--accent); }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin-top: -7.5px;
+    border-radius: 50%; background: #fff; border: 1px solid rgba(0,0,0,.2);
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px; border: none; border-radius: 50%; background: #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
+  .swatches { display: flex; gap: 9px; align-items: center; }
+  .sw {
+    width: 32px; height: 32px; border-radius: 9px; border: 2px solid var(--line); cursor: pointer; padding: 0;
+    transition: box-shadow .12s ease;
+  }
+  .sw[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 3px var(--accent-soft); }
+  .sw.custom { position: relative; overflow: hidden; background: conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+  .sw.custom input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
+  .seg {
+    display: inline-flex; padding: 3px; gap: 3px; background: rgba(255,255,255,.05);
+    border: 1px solid var(--line); border-radius: 12px;
+  }
+  .seg button {
+    background: transparent; color: var(--txt-dim); border: none; font-size: 13px; font-weight: 600;
+    padding: 7px 14px; cursor: pointer; border-radius: 9px; transition: background .14s ease, color .14s ease;
+  }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; box-shadow: 0 2px 8px var(--accent-soft); }
+  .export-row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+  .export-row .btn-primary { flex: 1; padding: 14px; font-size: 15px; }
+  .note { font-size: 11px; color: var(--txt-dim); line-height: 1.5; margin-top: 9px; }
+  .note.warn { color: #E0B055; }
+
+  /* small icon toggle (e.g. crop orientation) */
+  .icon-toggle {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--txt);
+    font-size: 12.5px; font-weight: 600; padding: 7px 12px; border-radius: 11px; cursor: pointer;
+  }
+  .icon-toggle:active { transform: scale(.97); }
+  .icon-toggle:disabled { opacity: .35; }
+  .icon-toggle svg { width: 16px; height: 16px; }
 
   /* ===== bottom mode toolbar ===== */
   .toolbar {
     flex: 0 0 auto; height: calc(var(--toolbar-h) + var(--safe-b));
     padding-bottom: var(--safe-b);
     display: grid; grid-template-columns: repeat(4, 1fr);
-    background: var(--panel); border-top: 1px solid var(--line);
+    background: var(--ink); border-top: 1px solid var(--line);
   }
   .mode {
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-    color: var(--txt-dim); background: none; border: none; cursor: pointer; font-size: 11px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    color: var(--txt-dim); background: none; border: none; cursor: pointer; font-size: 11px; font-weight: 550;
+    transition: color .12s ease;
   }
-  .mode svg { width: 22px; height: 22px; }
+  .mode svg { width: 23px; height: 23px; }
   .mode[aria-selected="true"] { color: var(--accent); }
   .mode:disabled { opacity: .4; }
-
-  /* ===== control sheet (per-mode) ===== */
-  /* ===== collapsible sheet handle ===== */
-  .sheet-handle {
-    flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-    height: 26px; background: var(--panel); border-top: 1px solid var(--line);
-    cursor: pointer; color: var(--txt-dim); user-select: none;
-  }
-  .sheet-handle.hidden { display: none; }
-  .sheet-handle .grip { width: 34px; height: 4px; border-radius: 2px; background: #5a5a5a; }
-  .sheet-handle .chev { font-size: 11px; line-height: 1; }
-  body.sheets-collapsed .sheet { display: none !important; }
-
-  .sheet {
-    flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--line);
-    max-height: 46vh; overflow-y: auto; padding: 10px 12px 12px;
-    -webkit-overflow-scrolling: touch;
-  }
-  .sheet.hidden { display: none; }
-  .row { margin: 9px 0; }
-  .row > .lab { font-size: 11px; color: var(--txt-dim); margin-bottom: 6px; display: flex; justify-content: space-between; }
-  .chips { display: flex; gap: 7px; flex-wrap: wrap; }
-  .chip {
-    border: 1px solid var(--line); background: var(--panel-2); color: var(--txt);
-    font-size: 12.5px; padding: 7px 11px; border-radius: 9px; cursor: pointer; white-space: nowrap;
-  }
-  .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: rgba(74,158,255,.08); }
-  input[type="range"] { width: 100%; accent-color: var(--accent); height: 26px; }
-  .swatches { display: flex; gap: 8px; align-items: center; }
-  .sw {
-    width: 30px; height: 30px; border-radius: 8px; border: 2px solid var(--line); cursor: pointer; padding: 0;
-  }
-  .sw[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(74,158,255,.25); }
-  .sw.custom { position: relative; overflow: hidden; background: conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
-  .sw.custom input { position: absolute; inset: -6px; opacity: 0; cursor: pointer; }
-  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
-  .seg button { background: var(--panel-2); color: var(--txt); border: none; font-size: 12.5px; padding: 7px 13px; cursor: pointer; }
-  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
-  .export-row { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
-  .export-row .btn-primary { flex: 1; padding: 13px; font-size: 15px; }
-  .note { font-size: 11px; color: var(--txt-dim); line-height: 1.45; margin-top: 8px; }
-  .note.warn { color: #E0B055; }
 
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
@@ -188,6 +259,7 @@
     </button>
   </div>
 
+  <div class="stage-wrap">
   <div class="workspace" id="workspace">
     <canvas id="stage"></canvas>
 
@@ -203,6 +275,7 @@
     <div class="busy" id="busy"><div class="spinner"></div></div>
   </div>
 
+  <div class="dock hidden" id="dock">
   <div class="filmstrip hidden" id="filmstrip"></div>
 
   <div class="sheet-handle hidden" id="sheetHandle">
@@ -296,8 +369,14 @@
         <button class="chip" data-ratio="original" id="cropChipOriginal">Asli</button>
       </div>
     </div>
+    <div class="row" id="cropOrientRow" style="display:none">
+      <button class="icon-toggle" id="btnCropOrient" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a9 9 0 0 0-15-3L3 8"/><path d="M3 3v5h5"/><path d="M3 16a9 9 0 0 0 15 3l3-3"/><path d="M21 21v-5h-5"/></svg>
+        <span id="cropOrientLabel">Potret</span>
+      </button>
+    </div>
     <div class="export-row">
-      <button class="chip" id="btnCropReset" style="padding:13px 16px">Atur ulang</button>
+      <button class="chip ghost" id="btnCropReset" style="padding:13px 16px">Atur ulang</button>
       <button class="btn-primary" id="btnCropExport">Ekspor</button>
     </div>
     <div class="note" id="cropExportNote"></div>
@@ -378,6 +457,8 @@
     </div>
     <div class="note" id="carouselNote"></div>
   </div>
+  </div><!-- /dock -->
+  </div><!-- /stage-wrap -->
 
   <div class="toolbar" id="toolbar">
     <button class="mode" data-mode="frame" aria-selected="true">
@@ -825,8 +906,11 @@ const renderer = (function () {
       return;
     }
     const r = geometryCore.parseRatio(src.crop.ratio, src.w, src.h);
+    // honor the per-image orientation flip (landscape) for non-square ratios
+    let rw = r.w, rh = r.h;
+    if (src.crop.flip && src.crop.ratio !== "original" && r.w !== r.h) { rw = r.h; rh = r.w; }
     const box = geometryCore.computeCropBoxLocked({
-      sourceW: src.w, sourceH: src.h, ratioW: r.w, ratioH: r.h,
+      sourceW: src.w, sourceH: src.h, ratioW: rw, ratioH: rh,
       zoom: src.crop.zoom, centerX: src.crop.cx * src.w, centerY: src.crop.cy * src.h,
     });
     const sx = Math.max(0, Math.round(box.x)), sy = Math.max(0, Math.round(box.y));
@@ -1067,14 +1151,26 @@ const cropMode = (function () {
   function cur() {
     const src = renderer.activeSource();
     if (!src) return null;
-    if (!src.crop) src.crop = { ratio: "original", zoom: 1, cx: 0.5, cy: 0.5 };
+    if (!src.crop) src.crop = { ratio: "original", zoom: 1, cx: 0.5, cy: 0.5, flip: false };
+    if (src.crop.flip === undefined) src.crop.flip = false;
     return src.crop;
   }
 
   function ratioNums() {
     const src = renderer.activeSource();
     const c = cur();
-    return geometryCore.parseRatio(c ? c.ratio : "original", src ? src.w : 1, src ? src.h : 1);
+    const base = geometryCore.parseRatio(c ? c.ratio : "original", src ? src.w : 1, src ? src.h : 1);
+    // orientation flip: swap the aspect for non-square, non-original ratios
+    if (c && c.flip && c.ratio !== "original" && base.w !== base.h) {
+      return { w: base.h, h: base.w };
+    }
+    return base;
+  }
+
+  // true when the active ratio has a meaningful orientation (not square/original)
+  function canFlip() {
+    const c = cur();
+    return !!c && c.ratio !== "original" && c.ratio !== "1:1";
   }
 
   async function applyChange() {
@@ -1116,7 +1212,7 @@ const cropMode = (function () {
 
   function reset() {
     const c = cur();
-    c.ratio = "original"; c.zoom = 1; c.cx = 0.5; c.cy = 0.5;
+    c.ratio = "original"; c.zoom = 1; c.cx = 0.5; c.cy = 0.5; c.flip = false;
     applyChange();
   }
 
@@ -1228,7 +1324,7 @@ const cropMode = (function () {
     return { box: boxFor(src.w, src.h), ratio: ratioNums() };
   }
 
-  return { bind, reset, drawPreview, exportBox, ratioNums, cur, applyChange };
+  return { bind, reset, drawPreview, exportBox, ratioNums, cur, applyChange, canFlip };
 })();
 
 /* ===========================================================================
@@ -1699,6 +1795,7 @@ const ui = (function () {
   const picker = document.getElementById("filePicker");
   const busy = document.getElementById("busy");
   const workspace = document.getElementById("workspace");
+  let refreshFills = () => {}; // set in bind(); repaints slider fill on programmatic change
 
   function applyStrings() {
     document.getElementById("appTitle").textContent = STRINGS.appTitle;
@@ -1807,6 +1904,7 @@ const ui = (function () {
     document.getElementById("qualityVal").textContent = Math.round(o.quality * 100);
     pressGroup("#formatSeg button", "fmt", o.format);
     syncFrameRows();
+    refreshFills();
   }
 
   function renderPresets() {
@@ -1910,8 +2008,16 @@ const ui = (function () {
 
   function syncCropControls() {
     const src = renderer.activeSource();
-    const ratio = src && src.crop ? src.crop.ratio : "original";
+    const cr = src && src.crop ? src.crop : null;
+    const ratio = cr ? cr.ratio : "original";
     pressGroup("#cropRatioChips .chip", "ratio", ratio);
+    const row = document.getElementById("cropOrientRow");
+    const can = cropMode.canFlip();
+    row.style.display = can ? "block" : "none";
+    if (can) {
+      const n = cropMode.ratioNums();
+      document.getElementById("cropOrientLabel").textContent = n.w < n.h ? "Potret" : "Lanskap";
+    }
   }
 
   function bindCropControls() {
@@ -1920,11 +2026,20 @@ const ui = (function () {
         const cr = cropMode.cur();
         if (!cr) return;
         cr.ratio = c.dataset.ratio;
-        // re-clamp current centre into the new ratio's box
-        cr.zoom = 1; cr.cx = 0.5; cr.cy = 0.5;
+        // re-clamp current centre into the new ratio's box, default orientation
+        cr.zoom = 1; cr.cx = 0.5; cr.cy = 0.5; cr.flip = false;
         pressGroup("#cropRatioChips .chip", "ratio", c.dataset.ratio);
         cropMode.applyChange();
+        syncCropControls();
       }));
+    document.getElementById("btnCropOrient").addEventListener("click", () => {
+      const cr = cropMode.cur();
+      if (!cr || !cropMode.canFlip()) return;
+      cr.flip = !cr.flip;
+      cr.cx = 0.5; cr.cy = 0.5; // re-centre after the aspect swaps
+      cropMode.applyChange();
+      syncCropControls();
+    });
     document.getElementById("btnCropReset").addEventListener("click", () => { cropMode.reset(); syncCropControls(); });
     document.getElementById("btnCropExport").addEventListener("click", () => exporter.run());
   }
@@ -2024,6 +2139,7 @@ const ui = (function () {
     const has = state.sources.length > 0;
     empty.classList.toggle("hidden", has);
     document.getElementById("stage").style.display = has ? "block" : "none";
+    document.getElementById("dock").classList.toggle("hidden", !has);
     document.getElementById("sheetHandle").classList.toggle("hidden", !has);
   }
 
@@ -2112,6 +2228,29 @@ const ui = (function () {
     cropMode.bind();
     collageMode.bind();
     carouselMode.bind();
+
+    // Keep the canvas crisp whenever the stage area actually changes size
+    // (import layout settle, URL-bar show/hide, rotation) — fixes the "first
+    // import looks compressed until you touch a control" issue at the source.
+    if (typeof ResizeObserver !== "undefined") {
+      let raf = 0;
+      const ro = new ResizeObserver(() => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => renderer.draw());
+      });
+      ro.observe(document.getElementById("workspace"));
+    }
+
+    // Slider fill: paint the filled portion of the track (WebKit needs --fill).
+    function setFill(el) {
+      const min = +el.min || 0, max = +el.max || 100, v = +el.value;
+      el.style.setProperty("--fill", ((v - min) / (max - min)) * 100 + "%");
+    }
+    document.addEventListener("input", (e) => {
+      if (e.target && e.target.matches && e.target.matches('input[type="range"]')) setFill(e.target);
+    }, true);
+    refreshFills = () => document.querySelectorAll('input[type="range"]').forEach(setFill);
+    refreshFills();
 
     // Persist last-used settings on any control interaction (debounced).
     ["sheetFrame", "sheetCollage", "sheetCarousel"].forEach((id) => {
