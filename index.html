@@ -2238,7 +2238,27 @@ const pwa = (function () {
   function registerSW() {
     if (!("serviceWorker" in navigator)) return;
     if (!/^https?:$/.test(location.protocol)) return; // SW needs http(s)/localhost
-    navigator.serviceWorker.register("./sw.js").catch((e) => console.warn("SW register failed", e));
+    // Reload once when an UPDATED worker takes control. Guarded so it never fires
+    // on first install (no prior controller) or loops.
+    const hadController = !!navigator.serviceWorker.controller;
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshing || !hadController) return;
+      refreshing = true;
+      location.reload();
+    });
+    navigator.serviceWorker.register("./sw.js").then((reg) => {
+      if (reg.waiting && navigator.serviceWorker.controller) reg.waiting.postMessage("SKIP_WAITING");
+      reg.addEventListener("updatefound", () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener("statechange", () => {
+          if (nw.state === "installed" && navigator.serviceWorker.controller) {
+            nw.postMessage("SKIP_WAITING"); // activate the update immediately
+          }
+        });
+      });
+    }).catch((e) => console.warn("SW register failed", e));
   }
 
   let deferred = null;
