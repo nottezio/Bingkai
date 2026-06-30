@@ -248,7 +248,58 @@
   .icon-toggle:disabled { opacity: .35; }
   .icon-toggle svg { width: 16px; height: 16px; }
 
-  /* ===== bottom mode toolbar ===== */
+  /* export history rows */
+  .hist-empty { color: var(--txt-dim); font-size: 13px; text-align: center; padding: 24px 0; }
+  .hist-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .hist-row:last-of-type { border-bottom: none; }
+  .hist-thumb { position: relative; width: 56px; height: 56px; flex: 0 0 auto; border-radius: 9px; overflow: hidden; border: 1px solid var(--line); background: #0b0d10; }
+  .hist-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hist-thumb .cnt { position: absolute; right: 3px; bottom: 3px; background: rgba(0,0,0,.7); color: #fff; font-size: 9.5px; font-weight: 600; padding: 1px 5px; border-radius: 5px; }
+  .hist-meta { flex: 1 1 auto; min-width: 0; }
+  .hist-meta .ttl { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-meta .sub { font-size: 11.5px; color: var(--txt-dim); margin-top: 2px; }
+  .hist-acts { display: flex; gap: 6px; flex: 0 0 auto; }
+  .hist-acts button { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel-2); color: var(--txt); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .hist-acts button.danger { color: #ff6b6b; }
+
+  /* ===== bottom-sheet modals (settings, preview) ===== */
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.62);
+    display: flex; align-items: flex-end; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .2s ease;
+  }
+  .modal-backdrop.show { opacity: 1; pointer-events: auto; }
+  .modal {
+    width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto;
+    background: var(--ink); border: 1px solid var(--line); border-bottom: none;
+    border-radius: 20px 20px 0 0; padding: 16px 18px calc(20px + var(--safe-b));
+    transform: translateY(16px); transition: transform .22s cubic-bezier(.4,0,.2,1);
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-backdrop.show .modal { transform: none; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .modal-head h2 { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
+  .modal .close-x {
+    width: 32px; height: 32px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--panel-2); color: var(--txt); display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .field { margin: 14px 0; }
+  .field > label { display: block; font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; color: var(--txt-dim); margin-bottom: 8px; }
+  .field input[type="text"] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); color: var(--txt);
+    border-radius: 11px; padding: 11px 13px; font-size: 14px; font-family: inherit;
+  }
+  .field input[type="text"]:focus { outline: none; border-color: var(--accent); }
+  .name-preview { font-size: 12px; color: var(--txt-dim); margin-top: 8px; word-break: break-all; }
+  .name-preview b { color: var(--txt); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* preview grid */
+  .pv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin: 4px 0 8px; }
+  .pv-item { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: #0b0d10; }
+  .pv-item img { width: 100%; display: block; }
+  .pv-item .pv-no { position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 6px; backdrop-filter: blur(4px); }
+  .pv-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+  .pv-actions .btn-primary { flex: 1; padding: 13px; }
   .toolbar {
     flex: 0 0 auto; height: calc(var(--toolbar-h) + var(--safe-b));
     padding-bottom: var(--safe-b);
@@ -274,6 +325,12 @@
     <span class="spacer"></span>
     <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
+    </button>
+    <button class="icon-btn" id="btnHistory" aria-label="Riwayat ekspor">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+    </button>
+    <button class="icon-btn" id="btnSettings" aria-label="Pengaturan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
     <button class="icon-btn" id="btnInstall" style="display:none" aria-label="Pasang aplikasi">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 4 5-4M5 21h14"/></svg>
@@ -405,7 +462,7 @@
     <div class="row" id="cropToolsRow" style="display:flex; gap:9px; flex-wrap:wrap">
       <button class="icon-toggle" id="btnCropRotate" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a9 9 0 0 1 15-3l3 3"/><path d="M21 3v6h-6"/></svg>
-        <span>Putar 90°</span>
+        <span id="lblCropRotate">Putar 90°</span>
       </button>
       <button class="icon-toggle" id="btnCropOrient" type="button" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a9 9 0 0 0-15-3L3 8"/><path d="M3 3v5h5"/><path d="M3 16a9 9 0 0 0 15 3l3-3"/><path d="M21 21v-5h-5"/></svg>
@@ -504,6 +561,7 @@
     <div class="note" id="carouselHint"></div>
     <div class="export-row">
       <button class="btn-primary" id="btnCarouselExport">Ekspor</button>
+      <button class="chip ghost" id="btnCarouselPreview" style="padding:13px 16px">Pratinjau</button>
       <button class="chip ghost" id="btnCarouselSave" style="padding:13px 16px">Simpan</button>
     </div>
     <div class="note" id="carouselNote"></div>
@@ -534,14 +592,130 @@
 
 <input id="filePicker" class="sr-only" type="file" accept="image/*" multiple />
 
+<div class="modal-backdrop" id="historyModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="historyTitle">Riwayat ekspor</h2>
+      <button class="close-x" id="historyClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="histList"></div>
+    <div class="hist-empty" id="histEmpty">Belum ada ekspor.</div>
+    <button class="chip ghost" id="histClear" style="margin-top:12px; display:none">Hapus semua</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="settingsTitle">Pengaturan</h2>
+      <button class="close-x" id="settingsClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="field">
+      <label id="lblLanguage">Language</label>
+      <div class="seg" id="langSeg">
+        <button data-lang="en" id="langEn">English</button>
+        <button data-lang="id" id="langId">Bahasa Indonesia</button>
+      </div>
+    </div>
+    <div class="field">
+      <label id="lblNamePrefix">Awalan nama ekspor</label>
+      <input type="text" id="namePrefix" maxlength="40" placeholder="bingkai" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label id="lblNameMode">Penomoran</label>
+      <div class="seg" id="nameModeSeg">
+        <button data-m="date" id="nameModeDate">Tanggal/waktu</button>
+        <button data-m="seq" id="nameModeSeq">Urutan</button>
+      </div>
+      <div class="name-preview" id="namePreview"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="previewModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="previewTitle">Pratinjau ekspor</h2>
+      <button class="close-x" id="previewClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="pv-grid" id="pvGrid"></div>
+    <div class="pv-actions">
+      <button class="btn-primary" id="pvShare">Ekspor</button>
+      <button class="chip ghost" id="pvSave" style="padding:13px 16px">Simpan</button>
+    </div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
 /* ===========================================================================
  * STRINGS — single source of all Bahasa Indonesia UI copy.
  * ======================================================================== */
-const STRINGS = {
-  appTitle: "Studio Foto",
+const STRINGS_EN = {
+  appTitle: "Photo Studio", docTitle: "Photo Studio",
+  modes: { frame: "Frame", crop: "Crop", collage: "Collage", carousel: "Carousel" },
+  emptyTitle: "No photos yet.",
+  emptySub: "Import JPEGs exported from Lightroom.",
+  import: "Import Photos",
+  dropHint: "or drag & drop here",
+  addPhoto: "Add photo",
+  loading: "Loading\u2026",
+  errDecode: "Could not read image: ",
+  errNoImages: "No valid image files.",
+  removeConfirm: "Remove this photo from the session?",
+  modeSoon: "This mode arrives in the next phase.",
+  ratio: "Ratio", original: "Original",
+  margin: "Margin", background: "Background", bgSolid: "Color", bgBlur: "Blur",
+  frameColor: "Frame color",
+  exportSize: "Export size", sizeIG: "Instagram 1080", sizeHi: "High resolution",
+  quality: "JPEG quality", format: "Format", fmtJpeg: "JPEG (photo)", fmtPng: "PNG (design)",
+  exportBtn: "Export", exporting: "Exporting\u2026",
+  igNote: "1080px sRGB \u2014 Instagram's native width. No re-scaling on IG's side.",
+  hiNote: "Short side up to 2160px. IG downsizes to 1080 on upload.",
+  pngNote: "PNG suits text/flat graphics, not photos. Files are far larger; IG converts to JPEG anyway.",
+  upscaleWarn: "Source is smaller than 1080px \u2014 the result is upscaled and looks soft.",
+  shared: "Shared via the share sheet.",
+  downloaded: "Saved to your Downloads folder (not directly to the Gallery).",
+  exportFail: "Export failed. Try reducing size or quality.",
+  free: "Free", reset: "Reset",
+  cropHint: "Drag to pan \u00b7 pinch to zoom",
+  cropExportNote: "Using export profile: Instagram 1080 \u00b7 JPEG q92. Change it on the Frame tab.",
+  grid: "Grid", gutter: "Gutter", outerMargin: "Outer margin", gutterColor: "Gutter color",
+  collageHint: "Tap to select \u00b7 drag to pan \u00b7 drag onto another cell to swap",
+  needTwoForCollage: "Add more photos to fill the cells.",
+  tiles: "Tile count", tileRatio: "Tile ratio", fill: "Fill",
+  fillCover: "Fill (cover)", fillFit: "Fit",
+  carouselHint: "Swipe \u2194 preview tiles \u00b7 drag \u2195 reposition \u00b7 pinch to zoom",
+  carouselHintMove: "Drag to reposition \u00b7 pinch to zoom",
+  carouselHintBrowse: "Swipe \u2194 preview tiles \u00b7 drag \u2195 reposition \u00b7 pinch zoom",
+  previewTitle: "Export preview",
+  previewCarousel: "Carousel preview",
+  previewBatch: "Preview all",
+  carouselNote: "Exports N 1080px images in posting order. Each tile edge is exactly 1080px so IG won't shift the seams.",
+  sharedN: "Shared via the share sheet.",
+  zipped: "ZIP saved to Downloads.",
+  downloadedN: "tiles downloaded separately (share sheet unavailable).",
+  presets: "Presets", savePreset: "+ Save", promptName: "Preset name:",
+  presetSaved: "Preset saved.", deletePreset: "Delete this preset?",
+  blurStrength: "Blur strength", install: "Install app",
+  // settings / history / newer controls
+  settingsTitle: "Settings", namePrefixLabel: "Export name prefix", numberingLabel: "Numbering",
+  numberDate: "Date/time", numberSeq: "Sequence", language: "Language", example: "Example: ",
+  historyTitle: "Export history", historyEmpty: "No exports yet.", clearAll: "Clear all",
+  save: "Save", preview: "Preview", all: "All", rotate90: "Rotate 90\u00b0", layout: "Layout",
+  interaction: "Interaction", adjMove: "Reposition", adjBrowse: "Preview tiles",
+  portrait: "Portrait", landscape: "Landscape",
+};
+
+const STRINGS_ID = {
+  appTitle: "Studio Foto", docTitle: "Studio Foto",
   modes: { frame: "Bingkai", crop: "Potong", collage: "Kolase", carousel: "Carousel" },
   emptyTitle: "Belum ada foto.",
   emptySub: "Impor JPEG hasil ekspor Lightroom.",
@@ -577,14 +751,26 @@ const STRINGS = {
   carouselHint: "Geser \u2194 pratinjau tile \u00b7 geser \u2195 atur posisi \u00b7 cubit untuk zoom",
   carouselHintMove: "Seret untuk atur posisi \u00b7 cubit untuk zoom",
   carouselHintBrowse: "Geser \u2194 pratinjau tile \u00b7 geser \u2195 atur posisi \u00b7 cubit zoom",
-  carouselNote: "Mengekspor N gambar 1080px (seamless_01..) dalam urutan unggah. Tepi tiap tile sama persis 1080px agar IG tidak menggeser jahitan.",
+  previewTitle: "Pratinjau ekspor",
+  previewCarousel: "Pratinjau carousel",
+  previewBatch: "Pratinjau semua",
+  carouselNote: "Mengekspor N gambar 1080px dalam urutan unggah. Tepi tiap tile sama persis 1080px agar IG tidak menggeser jahitan.",
   sharedN: "Dibagikan lewat lembar berbagi.",
   zipped: "ZIP tersimpan ke Unduhan.",
   downloadedN: "tiap tile diunduh terpisah (lembar berbagi tidak tersedia).",
   presets: "Preset", savePreset: "+ Simpan", promptName: "Nama preset:",
   presetSaved: "Preset disimpan.", deletePreset: "Hapus preset ini?",
   blurStrength: "Kekuatan blur", install: "Pasang aplikasi",
+  settingsTitle: "Pengaturan", namePrefixLabel: "Awalan nama ekspor", numberingLabel: "Penomoran",
+  numberDate: "Tanggal/waktu", numberSeq: "Urutan", language: "Bahasa", example: "Contoh: ",
+  historyTitle: "Riwayat ekspor", historyEmpty: "Belum ada ekspor.", clearAll: "Hapus semua",
+  save: "Simpan", preview: "Pratinjau", all: "Semua", rotate90: "Putar 90\u00b0", layout: "Tata letak",
+  interaction: "Interaksi", adjMove: "Atur posisi", adjBrowse: "Pratinjau tile",
+  portrait: "Potret", landscape: "Lanskap",
 };
+
+let LANG = "en";
+let STRINGS = STRINGS_EN;
 
 /* ===========================================================================
  * geometryCore — INLINED VERBATIM from the P1-tested module.
@@ -793,6 +979,11 @@ const state = {
     quality: 0.92,      // JPEG quality
     format: "jpeg",     // 'jpeg' | 'png'
   },
+  exportName: {
+    prefix: "bingkai",  // per-session filename prefix
+    mode: "date",       // 'date' = timestamp · 'seq' = incrementing counter
+  },
+  exportSeq: 0,         // session counter for 'seq' naming
   collage: {
     rows: 2, cols: 2,
     template: null,      // null = uniform rows×cols grid; else a template id
@@ -1135,14 +1326,82 @@ const renderer = (function () {
  * export canvas defaults to sRGB → P3/AdobeRGB sources are normalized to sRGB,
  * which is exactly what Instagram expects.
  * ======================================================================== */
+/* ===========================================================================
+ * historyStore — recent exports persisted in IndexedDB ('bingkai-history').
+ * Stores the actual exported File blobs (capped) so a recent export can be
+ * re-shared or re-saved without re-editing. Separate DB from the session store
+ * so it never interferes with restore.
+ * ======================================================================== */
+const historyStore = (function () {
+  const DB = "bingkai-history", STORE = "exports", CAP = 24;
+  let dbp = null;
+  function open() {
+    if (dbp) return dbp;
+    dbp = new Promise((res, rej) => {
+      const r = indexedDB.open(DB, 1);
+      r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" }); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    return dbp;
+  }
+  function reqP(r) { return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+  async function store(mode) { const db = await open(); return db.transaction(STORE, mode).objectStore(STORE); }
+  async function list() { const st = await store("readonly"); const all = await reqP(st.getAll()); return (all || []).sort((a, b) => b.ts - a.ts); }
+  async function add(rec) { const st = await store("readwrite"); await reqP(st.put(rec)); await prune(); }
+  async function remove(id) { const st = await store("readwrite"); await reqP(st.delete(id)); }
+  async function clear() { const st = await store("readwrite"); await reqP(st.clear()); }
+  async function prune() {
+    const items = await list();
+    if (items.length > CAP) { const st = await store("readwrite"); for (const o of items.slice(CAP)) st.delete(o.id); }
+  }
+  return { add, list, remove, clear };
+})();
+
+/* ===========================================================================
+ * exporter — full-resolution render ON DEMAND, then release. Uses the full-res
+ * source bitmap (not the preview bitmap) so output is the real resolution. The
+ * export canvas defaults to sRGB → P3/AdobeRGB sources are normalized to sRGB,
+ * which is exactly what Instagram expects.
+ * ======================================================================== */
 const exporter = (function () {
 
-  function tsName(ratio, ext) {
+  // Record a successful export to history (best-effort; never breaks export).
+  async function record(files, meta) {
+    if (!meta || !files || !files.length) return;
+    try {
+      const rec = {
+        id: "exp_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
+        ts: Date.now(),
+        mode: meta.mode || state.mode,
+        label: meta.label || "",
+        count: files.length,
+        files: files.map((f) => ({ name: f.name, blob: f })),
+      };
+      await historyStore.add(rec);
+      if (ui.onHistoryChanged) ui.onHistoryChanged();
+    } catch (e) { /* swallow — history is non-critical */ }
+  }
+
+  function stamp() {
     const d = new Date();
     const p = (n) => String(n).padStart(2, "0");
-    const stamp = "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
-    return "bingkai_" + ratio.replace(":", "x") + "_" + stamp + "." + ext;
+    return "" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "_" + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
   }
+  function exportPrefix() {
+    const en = state.exportName || {};
+    const clean = String(en.prefix || "bingkai").trim().replace(/[^\w\-]+/g, "_").replace(/^_+|_+$/g, "");
+    return clean || "bingkai";
+  }
+  // Filename for a single export. 'date' → timestamp; 'seq' → session counter.
+  function nameFor(label, ext) {
+    const en = state.exportName || {};
+    let token;
+    if (en.mode === "seq") { state.exportSeq = (state.exportSeq || 0) + 1; token = String(state.exportSeq).padStart(3, "0"); persistName(); }
+    else token = stamp();
+    return exportPrefix() + "_" + String(label).replace(":", "x") + "_" + token + "." + ext;
+  }
+  function persistName() { try { persistence.scheduleSave(); } catch (_) {} try { sessionStore.scheduleMeta(); } catch (_) {} }
 
   function canvasToBlob(canvas, type, quality) {
     return new Promise((resolve, reject) => {
@@ -1160,16 +1419,18 @@ const exporter = (function () {
 
   let _forceDownload = false; // when true, skip the share sheet and save to device
 
-  async function deliver(blob, filename) {
+  async function deliver(blob, filename, meta) {
     const file = new File([blob], filename, { type: blob.type });
     // Prefer the native share sheet on Android (lets user pick IG directly)
     // unless the user explicitly chose "save to device".
     if (!_forceDownload && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file] }); ui.toast(STRINGS.shared); return; }
-      catch (e) { if (e && e.name === "AbortError") return; /* fall through to download */ }
+      try { await navigator.share({ files: [file] }); ui.toast(STRINGS.shared); await record([file], meta); return true; }
+      catch (e) { if (e && e.name === "AbortError") return false; /* fall through to download */ }
     }
     triggerDownload(blob, filename);
     ui.toast(STRINGS.downloaded);
+    await record([file], meta);
+    return true;
   }
 
   // JSZip (the one CDN dependency) is loaded lazily on first carousel export so
@@ -1190,22 +1451,25 @@ const exporter = (function () {
   }
 
   // Multi-file delivery for carousel: share files[] → ZIP (JSZip) → per-file.
-  async function deliverMany(files) {
+  async function deliverMany(files, meta) {
     if (!_forceDownload && navigator.canShare && navigator.canShare({ files })) {
-      try { await navigator.share({ files }); ui.toast(STRINGS.sharedN); return; }
-      catch (e) { if (e && e.name === "AbortError") return; }
+      try { await navigator.share({ files }); ui.toast(STRINGS.sharedN); await record(files, meta); return true; }
+      catch (e) { if (e && e.name === "AbortError") return false; }
     }
     await ensureJSZip();
     if (typeof JSZip !== "undefined") {
       const zip = new JSZip();
       files.forEach((f) => zip.file(f.name, f));
       const blob = await zip.generateAsync({ type: "blob" });
-      triggerDownload(blob, "carousel_" + files.length + "tile.zip");
+      triggerDownload(blob, exportPrefix() + "_" + files.length + "tile.zip");
       ui.toast(STRINGS.zipped);
-      return;
+      await record(files, meta);
+      return true;
     }
     for (const f of files) { triggerDownload(f, f.name); await new Promise((r) => setTimeout(r, 300)); }
     ui.toast(files.length + " " + STRINGS.downloadedN);
+    await record(files, meta);
+    return true;
   }
 
   // Render the active source at full export resolution and deliver it.
@@ -1251,7 +1515,7 @@ const exporter = (function () {
       const quality = opt.format === "png" ? undefined : opt.quality;
       const blob = await canvasToBlob(canvas, type, quality);
       const ext = opt.format === "png" ? "png" : "jpg";
-      await deliver(blob, tsName(ratioLabel, ext));
+      await deliver(blob, nameFor(ratioLabel, ext), { mode: state.mode, label: ratioLabel });
     } catch (e) {
       console.error("export failed", e);
       ui.toast(STRINGS.exportFail);
@@ -1282,7 +1546,7 @@ const exporter = (function () {
       compositor.composeFrame(ctx, eff.bitmap, eff.w, eff.h, Cw, Ch, f);
       const blob = await canvasToBlob(cv, type, quality);
       const num = String(i).padStart(2, "0");
-      files.push(new File([blob], "bingkai_" + f.ratio.replace(":", "x") + "_" + num + "." + ext, { type: blob.type }));
+      files.push(new File([blob], exportPrefix() + "_" + f.ratio.replace(":", "x") + "_" + num + "." + ext, { type: blob.type }));
       cv.width = 0; cv.height = 0; // release each before the next
     }
     return files;
@@ -1295,7 +1559,7 @@ const exporter = (function () {
     if (state.sources.length < 2) return run();
     ui.setBusy(true);
     try {
-      await deliverMany(await batchFiles());
+      await deliverMany(await batchFiles(), { mode: "frame", label: "batch " + state.sources.length });
     } catch (e) {
       console.error("batch export failed", e);
       ui.toast(STRINGS.exportFail);
@@ -1309,7 +1573,7 @@ const exporter = (function () {
   async function save() { return withDownload(run); }
   async function saveBatch() { return withDownload(runBatch); }
 
-  return { run, runBatch, batchFiles, save, saveBatch, withDownload, deliverMany, triggerDownload };
+  return { run, runBatch, batchFiles, save, saveBatch, withDownload, deliverMany, triggerDownload, exportPrefix, nameFor };
 })();
 
 
@@ -1985,33 +2249,38 @@ const carouselMode = (function () {
   }
 
   // ----- export N tiles in upload order, sequentially (flat memory) -----
-  async function exportTiles() {
+  // Compose the N seamless tiles as File[] (no delivery) — used by export + preview.
+  async function carouselFiles() {
     const src = renderer.activeSource();
-    if (!src) return;
+    if (!src) return [];
     const eff = renderer.effective(src);
     const { N, Hc, Wc, b } = composite();
     const map = mapping(eff, Wc, Hc);
     const opt = state.exportOpt;
     const ext = opt.format === "png" ? "png" : "jpg";
     const type = opt.format === "png" ? "image/png" : "image/jpeg";
-    const names = geometryCore.carouselFilenames(N, "seamless", ext);
+    const names = geometryCore.carouselFilenames(N, exporter.exportPrefix(), ext);
+    const files = [];
+    for (let k = 0; k < N; k++) {
+      const w = b[k + 1] - b[k];
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = Hc;
+      const ctx = cv.getContext("2d", { alpha: opt.format === "png" });
+      drawTile(ctx, k, eff, map, b, Wc, Hc, { x: 0, y: 0, w, h: Hc }); // WYSIWYG
+      const quality = opt.format === "png" ? undefined : opt.quality;
+      const blob = await new Promise((res) => cv.toBlob(res, type, quality));
+      files.push(new File([blob], names[k], { type: blob.type }));
+      cv.width = 0; cv.height = 0; // release each tile before the next
+    }
+    return files;
+  }
 
+  async function exportTiles() {
+    const src = renderer.activeSource();
+    if (!src) return;
     ui.setBusy(true);
     try {
-      const files = [];
-      for (let k = 0; k < N; k++) {
-        const w = b[k + 1] - b[k];
-        const cv = document.createElement("canvas");
-        cv.width = w; cv.height = Hc;
-        const ctx = cv.getContext("2d", { alpha: opt.format === "png" });
-        // same path as the preview → WYSIWYG
-        drawTile(ctx, k, eff, map, b, Wc, Hc, { x: 0, y: 0, w, h: Hc });
-        const quality = opt.format === "png" ? undefined : opt.quality;
-        const blob = await new Promise((res) => cv.toBlob(res, type, quality));
-        files.push(new File([blob], names[k], { type: blob.type }));
-        cv.width = 0; cv.height = 0; // release each tile before the next
-      }
-      await exporter.deliverMany(files);
+      await exporter.deliverMany(await carouselFiles(), { mode: "carousel", label: state.carousel.n + " tile" });
     } catch (e) {
       console.error("carousel export", e);
       ui.toast(STRINGS.exportFail);
@@ -2020,7 +2289,7 @@ const carouselMode = (function () {
     }
   }
 
-  return { bind, drawPreview, exportTiles, composite, mapping, drawTile, syncPosition };
+  return { bind, drawPreview, exportTiles, carouselFiles, composite, mapping, drawTile, syncPosition };
 })();
 
 const ui = (function () {
@@ -2083,7 +2352,30 @@ const ui = (function () {
     document.getElementById("labPresets").textContent = STRINGS.presets;
     document.getElementById("btnSavePreset").textContent = STRINGS.savePreset;
     document.getElementById("btnInstall").setAttribute("aria-label", STRINGS.install);
+    // newer controls (naming, preview, history, rotate, carousel interaction)
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt("btnSave", STRINGS.save); setTxt("btnExportAll", STRINGS.all);
+    setTxt("btnCropSave", STRINGS.save); setTxt("btnCollageSave", STRINGS.save);
+    setTxt("btnCarouselSave", STRINGS.save); setTxt("btnCarouselPreview", STRINGS.preview);
+    setTxt("lblCropRotate", STRINGS.rotate90); setTxt("labTemplate", STRINGS.layout);
+    setTxt("labAdjust", STRINGS.interaction); setTxt("adjMove", STRINGS.adjMove); setTxt("adjBrowse", STRINGS.adjBrowse);
+    setTxt("settingsTitle", STRINGS.settingsTitle); setTxt("lblNamePrefix", STRINGS.namePrefixLabel);
+    setTxt("lblNameMode", STRINGS.numberingLabel); setTxt("nameModeDate", STRINGS.numberDate); setTxt("nameModeSeq", STRINGS.numberSeq);
+    setTxt("lblLanguage", STRINGS.language);
+    setTxt("historyTitle", STRINGS.historyTitle); setTxt("histEmpty", STRINGS.historyEmpty); setTxt("histClear", STRINGS.clearAll);
+    setTxt("previewTitle", STRINGS.previewTitle); setTxt("pvShare", STRINGS.exportBtn); setTxt("pvSave", STRINGS.save);
+    const np = document.getElementById("namePrefix"); if (np) np.placeholder = "bingkai";
+    document.documentElement.lang = LANG;
+    document.title = STRINGS.docTitle;
     updateExportNote();
+  }
+
+  function applyLang(lang) {
+    LANG = (lang === "id") ? "id" : "en";
+    STRINGS = (LANG === "id") ? STRINGS_ID : STRINGS_EN;
+    try { localStorage.setItem("bingkai-lang", LANG); } catch (_) {}
+    applyStrings();
+    pressGroup("#langSeg button", "lang", LANG);
   }
 
   // ----- frame control panel -------------------------------------------------
@@ -2122,7 +2414,7 @@ const ui = (function () {
     document.getElementById("frameOrientRow").style.display = canFlip ? "" : "none";
     if (canFlip) {
       const r = compositor.frameRatio(f, 1000, 1000); // dims irrelevant for preset ratios
-      document.getElementById("frameOrientLabel").textContent = r.w < r.h ? "Potret" : "Lanskap";
+      document.getElementById("frameOrientLabel").textContent = r.w < r.h ? STRINGS.portrait : STRINGS.landscape;
     }
   }
 
@@ -2246,7 +2538,6 @@ const ui = (function () {
     document.getElementById("btnUndo").addEventListener("click", () => undo.pop());
     document.getElementById("btnExport").addEventListener("click", () => exporter.run());
     document.getElementById("btnSave").addEventListener("click", () => exporter.save());
-    document.getElementById("btnExportAll").addEventListener("click", () => exporter.runBatch());
     // Blur strength
     const br = document.getElementById("blurRange");
     br.addEventListener("input", () => {
@@ -2276,7 +2567,7 @@ const ui = (function () {
     btn.style.display = can ? "inline-flex" : "none";
     if (can) {
       const n = cropMode.ratioNums();
-      document.getElementById("cropOrientLabel").textContent = n.w < n.h ? "Potret" : "Lanskap";
+      document.getElementById("cropOrientLabel").textContent = n.w < n.h ? STRINGS.portrait : STRINGS.landscape;
     }
   }
 
@@ -2569,6 +2860,7 @@ const ui = (function () {
     cropMode.bind();
     collageMode.bind();
     carouselMode.bind();
+    bindExtras();
 
     // Keep the canvas crisp whenever the stage area actually changes size
     // (import layout settle, URL-bar show/hide, rotation) — fixes the "first
@@ -2631,7 +2923,136 @@ const ui = (function () {
     updateExportNote();
   }
 
-  return { applyStrings, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState };
+  // ---- settings + export preview modals -------------------------------------
+  function sampleName() {
+    const en = state.exportName || {};
+    const token = en.mode === "seq" ? String((state.exportSeq || 0) + 1).padStart(3, "0") : "20260630_2110";
+    return exporter.exportPrefix() + "_4x5_" + token + ".jpg";
+  }
+  function refreshNamePreview() {
+    const el = document.getElementById("namePreview");
+    if (el) el.innerHTML = STRINGS.example + "<b>" + sampleName() + "</b>";
+  }
+  function openSettings() {
+    document.getElementById("namePrefix").value = state.exportName.prefix || "";
+    pressGroup("#nameModeSeg button", "m", state.exportName.mode || "date");
+    refreshNamePreview();
+    document.getElementById("settingsModal").classList.add("show");
+  }
+  function closeSettings() { document.getElementById("settingsModal").classList.remove("show"); }
+
+  let pvFiles = [], pvUrls = [], pvMeta = null;
+  function clearPvUrls() { pvUrls.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }); pvUrls = []; }
+  async function openPreview(filesPromise, title, meta) {
+    let files = [];
+    try { setBusy(true); files = await filesPromise; } finally { setBusy(false); }
+    if (!files || !files.length) { toast(STRINGS.exportFail); return; }
+    pvFiles = files; pvMeta = meta || null; clearPvUrls();
+    const grid = document.getElementById("pvGrid"); grid.innerHTML = "";
+    document.getElementById("previewTitle").textContent = title || STRINGS.previewTitle;
+    files.forEach((f, i) => {
+      const u = URL.createObjectURL(f); pvUrls.push(u);
+      const cell = document.createElement("div"); cell.className = "pv-item";
+      const img = document.createElement("img"); img.src = u; img.alt = f.name;
+      const no = document.createElement("div"); no.className = "pv-no"; no.textContent = String(i + 1);
+      cell.appendChild(img); cell.appendChild(no); grid.appendChild(cell);
+    });
+    document.getElementById("previewModal").classList.add("show");
+  }
+  function closePreview() { document.getElementById("previewModal").classList.remove("show"); clearPvUrls(); pvFiles = []; pvMeta = null; }
+
+  // ---- export history (recents) ----
+  let histUrls = [];
+  function clearHistUrls() { histUrls.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }); histUrls = []; }
+  function timeAgo(ts) {
+    const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+    if (s < 60) return s + " dtk lalu";
+    const m = Math.floor(s / 60); if (m < 60) return m + " mnt lalu";
+    const h = Math.floor(m / 60); if (h < 24) return h + " jam lalu";
+    return Math.floor(h / 24) + " hari lalu";
+  }
+  function modeLabel(mode) { return (STRINGS.modes && STRINGS.modes[mode]) || mode; }
+  const SVG_SHARE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M16 6l-4-4-4 4"/><path d="M12 2v13"/></svg>';
+  const SVG_SAVE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+  const SVG_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>';
+  function filesFromRec(rec) { return rec.files.map((f) => new File([f.blob], f.name, { type: f.blob.type })); }
+  async function renderHistory() {
+    const list = document.getElementById("histList");
+    clearHistUrls();
+    let items = []; try { items = await historyStore.list(); } catch (_) {}
+    list.innerHTML = "";
+    document.getElementById("histEmpty").style.display = items.length ? "none" : "block";
+    document.getElementById("histClear").style.display = items.length ? "" : "none";
+    for (const it of items) {
+      const row = document.createElement("div"); row.className = "hist-row";
+      const thumb = document.createElement("div"); thumb.className = "hist-thumb";
+      const u = URL.createObjectURL(it.files[0].blob); histUrls.push(u);
+      const img = document.createElement("img"); img.src = u; thumb.appendChild(img);
+      if (it.count > 1) { const c = document.createElement("div"); c.className = "cnt"; c.textContent = "\u00d7" + it.count; thumb.appendChild(c); }
+      const meta = document.createElement("div"); meta.className = "hist-meta";
+      const ttl = document.createElement("div"); ttl.className = "ttl"; ttl.textContent = it.files[0].name;
+      const sub = document.createElement("div"); sub.className = "sub"; sub.textContent = modeLabel(it.mode) + " \u00b7 " + timeAgo(it.ts);
+      meta.appendChild(ttl); meta.appendChild(sub);
+      const acts = document.createElement("div"); acts.className = "hist-acts";
+      const share = document.createElement("button"); share.innerHTML = SVG_SHARE; share.setAttribute("aria-label", "Bagikan");
+      const save = document.createElement("button"); save.innerHTML = SVG_SAVE; save.setAttribute("aria-label", "Simpan");
+      const del = document.createElement("button"); del.className = "danger"; del.innerHTML = SVG_TRASH; del.setAttribute("aria-label", "Hapus");
+      share.addEventListener("click", () => exporter.deliverMany(filesFromRec(it)));
+      save.addEventListener("click", () => exporter.withDownload(() => exporter.deliverMany(filesFromRec(it))));
+      del.addEventListener("click", async () => { try { await historyStore.remove(it.id); } catch (_) {} renderHistory(); });
+      acts.appendChild(share); acts.appendChild(save); acts.appendChild(del);
+      row.appendChild(thumb); row.appendChild(meta); row.appendChild(acts);
+      list.appendChild(row);
+    }
+  }
+  function openHistory() { document.getElementById("historyModal").classList.add("show"); renderHistory(); }
+  function closeHistory() { document.getElementById("historyModal").classList.remove("show"); clearHistUrls(); }
+  function onHistoryChanged() { if (document.getElementById("historyModal").classList.contains("show")) renderHistory(); }
+
+  function bindExtras() {
+    // Settings
+    document.getElementById("btnSettings").addEventListener("click", openSettings);
+    document.getElementById("settingsClose").addEventListener("click", closeSettings);
+    document.getElementById("settingsModal").addEventListener("click", (e) => { if (e.target.id === "settingsModal") closeSettings(); });
+    document.getElementById("namePrefix").addEventListener("input", (e) => {
+      state.exportName.prefix = e.target.value;
+      persistence.scheduleSave(); refreshNamePreview();
+    });
+    document.querySelectorAll("#nameModeSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        state.exportName.mode = b.dataset.m;
+        pressGroup("#nameModeSeg button", "m", b.dataset.m);
+        persistence.scheduleSave(); refreshNamePreview();
+      }));
+    document.querySelectorAll("#langSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        applyLang(b.dataset.lang);
+        try { setMode(state.mode); } catch (_) {}  // refresh dynamic per-mode labels
+        refreshNamePreview();
+      }));
+    // Preview
+    document.getElementById("previewClose").addEventListener("click", closePreview);
+    document.getElementById("previewModal").addEventListener("click", (e) => { if (e.target.id === "previewModal") closePreview(); });
+    document.getElementById("pvShare").addEventListener("click", async () => {
+      const files = pvFiles.slice(), meta = pvMeta; closePreview();
+      await exporter.deliverMany(files, meta);
+    });
+    document.getElementById("pvSave").addEventListener("click", async () => {
+      const files = pvFiles.slice(), meta = pvMeta; closePreview();
+      await exporter.withDownload(() => exporter.deliverMany(files, meta));
+    });
+    document.getElementById("btnCarouselPreview").addEventListener("click", () =>
+      openPreview(carouselMode.carouselFiles(), STRINGS.previewCarousel, { mode: "carousel", label: state.carousel.n + " tile" }));
+    document.getElementById("btnExportAll").addEventListener("click", () =>
+      openPreview(exporter.batchFiles(), STRINGS.previewBatch, { mode: "frame", label: "batch " + state.sources.length }));
+    // History
+    document.getElementById("btnHistory").addEventListener("click", openHistory);
+    document.getElementById("historyClose").addEventListener("click", closeHistory);
+    document.getElementById("historyModal").addEventListener("click", (e) => { if (e.target.id === "historyModal") closeHistory(); });
+    document.getElementById("histClear").addEventListener("click", async () => { try { await historyStore.clear(); } catch (_) {} renderHistory(); });
+  }
+
+  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged };
 })();
 
 /* ===========================================================================
@@ -2652,6 +3073,7 @@ const persistence = (function () {
       exportOpt: { ig: o.ig, quality: o.quality, format: o.format },
       collage: { rows: co.rows, cols: co.cols, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor },
       carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill },
+      exportName: { prefix: state.exportName.prefix, mode: state.exportName.mode },
     };
   }
   function applySnapshot(s) {
@@ -2660,6 +3082,7 @@ const persistence = (function () {
     Object.assign(state.exportOpt, s.exportOpt || {});
     Object.assign(state.collage, s.collage || {});
     Object.assign(state.carousel, s.carousel || {});
+    if (s.exportName) Object.assign(state.exportName, s.exportName);
   }
 
   let saveT = null;
@@ -2850,6 +3273,7 @@ const sessionStore = (function () {
       crops,
       collage: { rows: co.rows, cols: co.cols, template: co.template, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor, cells: co.cells, selected: co.selected },
       carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill, adjust: c.adjust, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy },
+      exportSeq: state.exportSeq || 0,
     };
   }
   let mt = null;
@@ -2875,6 +3299,7 @@ const sessionStore = (function () {
     if (!state.sources.length) return false;
     if (meta.collage) Object.assign(state.collage, meta.collage);
     if (meta.carousel) Object.assign(state.carousel, meta.carousel);
+    if (typeof meta.exportSeq === "number") state.exportSeq = meta.exportSeq;
     state.activeId = (meta.activeId && state.sources.some((s) => s.id === meta.activeId)) ? meta.activeId : state.sources[0].id;
     state.mode = meta.mode || "frame";
     // bake any crops so every mode shows the cropped image immediately
@@ -2945,7 +3370,9 @@ const undo = (function () {
 
 async function boot() {
   persistence.loadSettings();   // restore last-used global settings before wiring UI
-  ui.applyStrings();
+  let savedLang = "en";
+  try { savedLang = localStorage.getItem("bingkai-lang") || "en"; } catch (_) {}
+  ui.applyLang(savedLang);      // sets STRINGS + applies all UI text (default English)
   ui.bind();
   ui.syncFrameControlsFromState();
   ui.renderPresets();
