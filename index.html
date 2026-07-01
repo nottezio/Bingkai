@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
 <meta name="theme-color" content="#2A2A2A" />
 <link rel="icon" href="data:," />
-<title>Bingkai — Studio Foto</title>
+<title>Bingkai</title>
 <!--
   SCRL-style Photo Framing & Carousel PWA — single file, Android-first.
   Build phase: P2 (app shell · import · two-resolution pipeline · EXIF orientation).
@@ -121,7 +121,7 @@
   /* ===== filmstrip ===== */
   .filmstrip {
     flex: 0 0 auto; display: flex; gap: 9px; padding: 11px 12px 7px; overflow-x: auto;
-    scrollbar-width: none;
+    scrollbar-width: none; scroll-snap-type: none; -webkit-overflow-scrolling: touch;
   }
   .filmstrip::-webkit-scrollbar { display: none; }
   .filmstrip.hidden { display: none; }
@@ -200,6 +200,10 @@
   /* ===== range slider ===== */
   input[type="range"] {
     -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: transparent; cursor: pointer;
+    /* pan-y: let vertical scroll-gestures pass through to the sheet; only
+       horizontal intent adjusts the value. Fixes accidental value changes
+       when scrolling a finger across the control panel. */
+    touch-action: pan-y;
   }
   input[type="range"]::-webkit-slider-runnable-track {
     height: 5px; border-radius: 3px;
@@ -300,6 +304,80 @@
   .pv-item .pv-no { position: absolute; top: 4px; left: 4px; background: rgba(0,0,0,.6); color: #fff; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 6px; backdrop-filter: blur(4px); }
   .pv-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
   .pv-actions .btn-primary { flex: 1; padding: 13px; }
+
+  /* ===== post preview (SCRL-style assembled post) ===== */
+  .modal.post-modal { max-width: 760px; }
+  .post-sub { font-size: 12px; color: var(--txt-dim); margin: -4px 0 10px; }
+  .post-sub b { color: var(--txt); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .post-strip {
+    position: relative; display: flex; gap: 12px; align-items: flex-start;
+    overflow-x: auto; overflow-y: hidden; padding: 6px 2px 16px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    scroll-snap-type: none;
+    /* free smooth scroll: NO scroll-snap (request #2) */
+  }
+  .post-strip::-webkit-scrollbar { display: none; }
+  .post-card {
+    position: relative; flex: 0 0 auto; width: 150px;
+    border-radius: 13px; overflow: hidden; background: #0b0d10; border: 1px solid var(--line);
+    transition: transform .16s ease, box-shadow .16s ease, opacity .14s ease;
+    touch-action: pan-x; /* card body lets the strip scroll horizontally */
+  }
+  .post-card canvas, .post-card img { width: 100%; display: block; }
+  .post-card .pc-no {
+    position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.62); color: #fff;
+    font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 7px;
+    backdrop-filter: blur(4px); font-variant-numeric: tabular-nums;
+  }
+  .post-card .pc-kind {
+    position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,.5); color: #fff;
+    font-size: 9px; text-transform: uppercase; letter-spacing: .05em; padding: 2px 7px;
+    border-radius: 6px; backdrop-filter: blur(4px);
+  }
+  .post-card .pc-handle {
+    position: absolute; bottom: 6px; right: 6px; width: 32px; height: 32px; border-radius: 9px;
+    background: rgba(0,0,0,.58); color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: grab; touch-action: none; backdrop-filter: blur(4px);
+  }
+  .post-card .pc-handle:active { cursor: grabbing; }
+  .post-card .pc-handle svg { width: 17px; height: 17px; pointer-events: none; }
+  .post-card.dragging { z-index: 6; box-shadow: 0 12px 34px rgba(0,0,0,.6); opacity: .96; transition: none; }
+  .pc-caret {
+    flex: 0 0 auto; align-self: stretch; width: 3px; border-radius: 3px;
+    background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); margin: 4px 0;
+  }
+  .post-empty { color: var(--txt-dim); font-size: 13px; text-align: center; padding: 34px 12px; width: 100%; }
+
+  /* ===== collage visual layout picker (#4a) ===== */
+  .lp-section-title { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; color: var(--txt-dim); margin: 16px 0 9px; }
+  .lp-section-title:first-of-type { margin-top: 4px; }
+  .lp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); gap: 10px; }
+  .lp-tile {
+    aspect-ratio: 1 / 1; border-radius: 11px; border: 1px solid var(--line); background: var(--panel-2);
+    padding: 9px; cursor: pointer; transition: border-color .12s ease, transform .1s ease, box-shadow .12s ease;
+  }
+  .lp-tile:active { transform: scale(.95); }
+  .lp-tile[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .lp-tile svg { width: 100%; height: 100%; display: block; }
+  .lp-tile .lp-cell { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 3; vector-effect: non-scaling-stroke; }
+  .lp-tile[aria-pressed="true"] .lp-cell { fill: var(--accent); }
+  /* collage: choose-layout button + cell-fill row (#4b) */
+  .btn-layout {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 12px; border-radius: 13px; border: 1px solid var(--line); background: var(--panel-2);
+    color: var(--txt); font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+    transition: border-color .12s ease, background .12s ease;
+  }
+  .btn-layout:active { background: rgba(255,255,255,.06); }
+  .btn-layout svg { width: 17px; height: 17px; }
+  .cell-fill-thumbs { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; scroll-snap-type: none; -webkit-overflow-scrolling: touch; }
+  .cell-fill-thumbs::-webkit-scrollbar { display: none; }
+  .cell-fill-thumb {
+    width: 46px; height: 46px; border-radius: 9px; overflow: hidden; border: 2px solid transparent;
+    background: #0b0d10; flex: 0 0 auto; cursor: pointer; padding: 0;
+  }
+  .cell-fill-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell-fill-thumb.in-cell { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
   .toolbar {
     flex: 0 0 auto; height: calc(var(--toolbar-h) + var(--safe-b));
     padding-bottom: var(--safe-b);
@@ -321,10 +399,13 @@
 <body>
 <div id="app">
   <div class="topbar">
-    <span class="title" id="appTitle">Studio Foto</span>
+    <span class="title" id="appTitle">Bingkai</span>
     <span class="spacer"></span>
     <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
+    </button>
+    <button class="icon-btn" id="btnPost" aria-label="Preview post">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="13" height="14" rx="2"/><path d="M19 8v9a2 2 0 0 1-2 2H8"/></svg>
     </button>
     <button class="icon-btn" id="btnHistory" aria-label="Riwayat ekspor">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
@@ -347,7 +428,7 @@
     <div class="empty" id="empty">
       <div class="drop" id="dropzone">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>
-        <div class="hint" id="emptyHint">Belum ada foto.<br>Impor JPEG hasil ekspor Lightroom.</div>
+        <div class="hint" id="emptyHint">Belum ada foto.<br>Impor foto untuk mulai menyusun post.</div>
         <button class="btn-primary" id="btnImport">Impor Foto</button>
         <div class="hint" id="dropHint" style="opacity:.7">atau seret &amp; lepas ke sini</div>
       </div>
@@ -478,6 +559,16 @@
   </div>
 
   <div class="sheet hidden" id="sheetCollage">
+    <div class="row">
+      <button class="btn-layout" id="btnLayoutPicker" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span id="lblChooseLayout">Choose a layout</span>
+      </button>
+    </div>
+    <div class="row" id="cellFillRow">
+      <div class="lab"><span id="labCellFill">Fill selected cell</span></div>
+      <div class="cell-fill-thumbs" id="cellFillThumbs"></div>
+    </div>
     <div class="row">
       <div class="lab"><span id="labGrid">Kisi</span></div>
       <div class="chips" id="gridChips">
@@ -652,6 +743,38 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="postModal">
+  <div class="modal post-modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="postTitle">Your post</h2>
+      <button class="close-x" id="postClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="post-sub" id="postSub"></div>
+    <div class="post-strip" id="postStrip"></div>
+    <div class="pv-actions" id="postActions">
+      <button class="btn-primary" id="postExport">Export post</button>
+      <button class="chip ghost" id="postSave" style="padding:13px 16px">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="layoutModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="layoutTitle">Choose a layout</h2>
+      <button class="close-x" id="layoutClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="lp-section-title" id="lpGridTitle">Grid</div>
+    <div class="lp-grid" id="lpGrid"></div>
+    <div class="lp-section-title" id="lpTplTitle">Layouts</div>
+    <div class="lp-grid" id="lpTemplates"></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 
@@ -659,10 +782,10 @@
  * STRINGS — single source of all Bahasa Indonesia UI copy.
  * ======================================================================== */
 const STRINGS_EN = {
-  appTitle: "Photo Studio", docTitle: "Photo Studio",
+  appTitle: "Bingkai", docTitle: "Bingkai",
   modes: { frame: "Frame", crop: "Crop", collage: "Collage", carousel: "Carousel" },
   emptyTitle: "No photos yet.",
-  emptySub: "Import JPEGs exported from Lightroom.",
+  emptySub: "Import photos to start building your post.",
   import: "Import Photos",
   dropHint: "or drag & drop here",
   addPhoto: "Add photo",
@@ -712,13 +835,19 @@ const STRINGS_EN = {
   save: "Save", preview: "Preview", all: "All", rotate90: "Rotate 90\u00b0", layout: "Layout",
   interaction: "Interaction", adjMove: "Reposition", adjBrowse: "Preview tiles",
   portrait: "Portrait", landscape: "Landscape",
+  postTitle: "Your post", postEmpty: "No photos yet \u2014 import some to start your post.",
+  postSlides: "slides", postSlide1: "slide", postImages: "images", postImage1: "image",
+  postReorderHint: "Drag the handle to reorder.",
+  exportPost: "Export post",
+  chooseLayout: "Choose a layout", layoutTitle: "Choose a layout",
+  lpGrid: "Grid", lpLayouts: "Layouts", cellFill: "Fill selected cell",
 };
 
 const STRINGS_ID = {
-  appTitle: "Studio Foto", docTitle: "Studio Foto",
+  appTitle: "Bingkai", docTitle: "Bingkai",
   modes: { frame: "Bingkai", crop: "Potong", collage: "Kolase", carousel: "Carousel" },
   emptyTitle: "Belum ada foto.",
-  emptySub: "Impor JPEG hasil ekspor Lightroom.",
+  emptySub: "Impor foto untuk mulai menyusun post.",
   import: "Impor Foto",
   dropHint: "atau seret & lepas ke sini",
   addPhoto: "Tambah foto",
@@ -767,6 +896,12 @@ const STRINGS_ID = {
   save: "Simpan", preview: "Pratinjau", all: "Semua", rotate90: "Putar 90\u00b0", layout: "Tata letak",
   interaction: "Interaksi", adjMove: "Atur posisi", adjBrowse: "Pratinjau tile",
   portrait: "Potret", landscape: "Lanskap",
+  postTitle: "Post kamu", postEmpty: "Belum ada foto \u2014 impor dulu untuk memulai post.",
+  postSlides: "slide", postSlide1: "slide", postImages: "gambar", postImage1: "gambar",
+  postReorderHint: "Seret gagang untuk mengurutkan.",
+  exportPost: "Ekspor post",
+  chooseLayout: "Pilih tata letak", layoutTitle: "Pilih tata letak",
+  lpGrid: "Kisi", lpLayouts: "Tata letak", cellFill: "Isi sel terpilih",
 };
 
 let LANG = "en";
@@ -1007,6 +1142,19 @@ const state = {
 let _idSeq = 0;
 const nextId = () => "src_" + (++_idSeq);
 const bumpIdSeq = (n) => { if (Number.isFinite(n) && n > _idSeq) _idSeq = n; };
+// Per-slide frame settings snapshot (primitives only). Each source owns one;
+// selecting a source repoints state.frame at it (Phase C).
+function cloneFrame(f) { return { ratio: f.ratio, flip: f.flip, marginPct: f.marginPct, frameColor: f.frameColor, bg: f.bg, blurStrength: f.blurStrength }; }
+// Per-slide carousel settings snapshot. Selecting a source repoints state.carousel at it.
+function cloneCarousel(c) { return { n: c.n, tileRatio: c.tileRatio, fill: c.fill, adjust: c.adjust, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy }; }
+// Per-slide collage settings (a collage slide owns its own subset of photos via its cells).
+function cloneCollage(c) {
+  return {
+    rows: c.rows, cols: c.cols, template: c.template, ratio: c.ratio,
+    marginPct: c.marginPct, gutterPct: c.gutterPct, gutterColor: c.gutterColor, selected: 0,
+    cells: (c.cells || []).map((x) => ({ srcId: x.srcId, zoom: x.zoom, cx: x.cx, cy: x.cy })),
+  };
+}
 
 /* ===========================================================================
  * importer — decode with EXIF orientation baked in, build two-res assets.
@@ -1067,7 +1215,7 @@ const importer = (function () {
           const w = bitmap.width, h = bitmap.height; // already orientation-corrected
           const thumbUrl = await makeThumbUrl(bitmap, w, h);
           const id = nextId();
-          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl, blob: f, crop: null, croppedBitmap: null, cropDims: null });
+          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl, blob: f, crop: null, croppedBitmap: null, cropDims: null, frame: cloneFrame(state.frame), kind: "frame", carousel: cloneCarousel(state.carousel), collage: cloneCollage(state.collage) });
           sessionStore.putSource({ id, name: f.name || (id + ".jpg"), blob: f });
           if (!state.activeId) state.activeId = id;
           ok++;
@@ -1079,7 +1227,7 @@ const importer = (function () {
     } finally {
       ui.setBusy(false);
     }
-    if (ok) { await renderer.useActive(); ui.refreshFilmstrip(); ui.refreshEmpty(); ui.updateExportNote(); if (state.mode === "collage") { collageMode.assignSources(); renderer.draw(); } sessionStore.scheduleMeta(); }
+    if (ok) { await renderer.useActive(); ui.refreshFilmstrip(); ui.refreshEmpty(); ui.updateExportNote(); if (state.mode === "collage") { collageMode.assignSources(); renderer.draw(); layoutPicker.refreshCellFill(); } sessionStore.scheduleMeta(); }
     return ok;
   }
 
@@ -1097,7 +1245,7 @@ const importer = (function () {
     const thumbUrl = await makeThumbUrl(bitmap, w, h);
     state.sources.push({
       id: rec.id, name: rec.name || (rec.id + ".jpg"), bitmap, w, h, thumbUrl,
-      blob: rec.blob, crop: crop || null, croppedBitmap: null, cropDims: null,
+      blob: rec.blob, crop: crop || null, croppedBitmap: null, cropDims: null, frame: cloneFrame(state.frame), kind: "frame", carousel: cloneCarousel(state.carousel), collage: cloneCollage(state.collage),
     });
     const n = parseInt(String(rec.id).replace(/^src_/, ""), 10);
     bumpIdSeq(n);
@@ -1247,6 +1395,9 @@ const renderer = (function () {
   async function useActive() {
     const src = activeSource();
     if (!src) { clear(); return; }
+    if (src.frame) state.frame = src.frame; // Phase C: frame settings are per-slide
+    if (src.carousel) state.carousel = src.carousel; // Phase C2: carousel settings per-slide
+    if (src.collage) state.collage = src.collage; // Phase C4: collage settings per-slide
     state.work = { id: src.id };
     draw();
   }
@@ -1528,7 +1679,7 @@ const exporter = (function () {
 
   // Build one framed File per photo (used by runBatch; exposed for testing).
   async function batchFiles() {
-    const f = state.frame, opt = state.exportOpt;
+    const opt = state.exportOpt;
     const type = opt.format === "png" ? "image/png" : "image/jpeg";
     const quality = opt.format === "png" ? undefined : opt.quality;
     const ext = opt.format === "png" ? "png" : "jpg";
@@ -1536,6 +1687,7 @@ const exporter = (function () {
     let i = 0;
     for (const src of state.sources) {
       i++;
+      const f = src.frame || state.frame; // per-slide frame settings
       const eff = renderer.effective(src);
       const r = compositor.frameRatio(f, eff.w, eff.h);
       const { Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig);
@@ -1573,7 +1725,76 @@ const exporter = (function () {
   async function save() { return withDownload(run); }
   async function saveBatch() { return withDownload(runBatch); }
 
-  return { run, runBatch, batchFiles, save, saveBatch, withDownload, deliverMany, triggerDownload, exportPrefix, nameFor };
+  // ---- Phase C3: flatten the whole post → ordered IG images ----
+  function seqName(i, ext) { return exportPrefix() + "_" + String(i).padStart(2, "0") + "." + ext; }
+  async function frameBlobFor(src) {
+    const opt = state.exportOpt;
+    const f = src.frame || state.frame;
+    const eff = renderer.effective(src);
+    const r = compositor.frameRatio(f, eff.w, eff.h);
+    const { Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig);
+    const cv = document.createElement("canvas");
+    cv.width = Cw; cv.height = Ch;
+    const ctx = cv.getContext("2d", { alpha: opt.format === "png" });
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    compositor.composeFrame(ctx, eff.bitmap, eff.w, eff.h, Cw, Ch, f);
+    const type = opt.format === "png" ? "image/png" : "image/jpeg";
+    const quality = opt.format === "png" ? undefined : opt.quality;
+    const blob = await canvasToBlob(cv, type, quality);
+    cv.width = 0; cv.height = 0;
+    return blob;
+  }
+  // Build every IG image for the post, in slide order (carousel → its N tiles).
+  async function collageBlobFor(src) {
+    const opt = state.exportOpt;
+    const d = collageMode.collageDims(src, opt.ig ? CONFIG.IG_WIDTH : 1440);
+    const cv = document.createElement("canvas");
+    cv.width = d.W; cv.height = d.H;
+    collageMode.compositeInto(cv, src, d.W, d.H);
+    const type = opt.format === "png" ? "image/png" : "image/jpeg";
+    const quality = opt.format === "png" ? undefined : opt.quality;
+    const blob = await canvasToBlob(cv, type, quality);
+    cv.width = 0; cv.height = 0;
+    return blob;
+  }
+  async function postFiles() {
+    const opt = state.exportOpt;
+    const ext = opt.format === "png" ? "png" : "jpg";
+    const slides = postModel.deriveFrameSlides(state.sources);
+    const files = [];
+    let i = 0;
+    for (const slide of slides) {
+      const src = state.sources.find((s) => s.id === slide.srcId);
+      if (!src) continue;
+      if (slide.kind === "carousel") {
+        const tiles = await carouselMode.tilesFor(src, src.carousel);
+        for (const t of tiles) { i++; files.push(new File([t.blob], seqName(i, ext), { type: t.blob.type })); }
+      } else if (slide.kind === "collage") {
+        i++;
+        const blob = await collageBlobFor(src);
+        files.push(new File([blob], seqName(i, ext), { type: blob.type }));
+      } else {
+        i++;
+        const blob = await frameBlobFor(src);
+        files.push(new File([blob], seqName(i, ext), { type: blob.type }));
+      }
+    }
+    return files;
+  }
+  async function runPost() {
+    if (!state.sources.length) return false;
+    ui.setBusy(true);
+    try {
+      const files = await postFiles();
+      if (!files.length) return false;
+      return await deliverMany(files, { mode: "post", label: files.length + " image post" });
+    } catch (e) {
+      console.error("post export", e); ui.toast(STRINGS.exportFail); return false;
+    } finally { ui.setBusy(false); }
+  }
+  async function savePost() { return withDownload(runPost); }
+
+  return { run, runBatch, batchFiles, save, saveBatch, withDownload, deliverMany, triggerDownload, exportPrefix, nameFor, postFiles, runPost, savePost };
 })();
 
 
@@ -1816,6 +2037,7 @@ const collageMode = (function () {
   let pinchPrev = 0;
   let gesture = null;     // { idx, snapshot, moved }
   let hoverTarget = -1;   // cell index a swap-drag is hovering
+  let onSelect = null;    // optional callback(cellIdx) when the selected cell changes
 
   function sourceFor(id) { return state.sources.find((s) => s.id === id) || null; }
 
@@ -1830,9 +2052,10 @@ const collageMode = (function () {
     const out = [];
     for (let i = 0; i < n; i++) {
       const prev = cur[i];
-      const stillValid = prev && srcs.some((s) => s.id === prev.srcId);
-      const srcId = stillValid ? prev.srcId : (srcs.length ? srcs[i % srcs.length].id : null);
-      out.push(stillValid ? prev : { srcId, zoom: 1, cx: 0.5, cy: 0.5 });
+      const stillValid = prev && prev.srcId && srcs.some((s) => s.id === prev.srcId);
+      // Per-slide collage owns an explicit subset: keep valid cells, leave the
+      // rest EMPTY (user fills via the cell picker) instead of grabbing pool photos.
+      out.push(stillValid ? prev : { srcId: (prev && prev.srcId) || null, zoom: 1, cx: 0.5, cy: 0.5 });
     }
     co.cells = out;
     if (co.selected >= n) co.selected = 0;
@@ -1841,11 +2064,10 @@ const collageMode = (function () {
   // Re-distribute sources across cells in order (cycling), preserving per-cell
   // transforms by position. Called when the photo set or grid changes so that
   // newly added images actually appear (fixes "collage shows only first image").
+  // Phase C4: collage cells are an explicit subset; preserve them (only ensure
+  // the cell array matches the current grid). No cyclic pool redistribution.
   function assignSources() {
     ensureCells();
-    const co = state.collage, srcs = state.sources;
-    if (!srcs.length) return;
-    co.cells.forEach((c, i) => { c.srcId = srcs[i % srcs.length].id; });
   }
 
   function ratioNums() {
@@ -1976,6 +2198,7 @@ const collageMode = (function () {
     gesture = { idx, moved: 0, snapshot: { ...state.collage.cells[idx] } };
     hoverTarget = -1;
     renderer.draw();
+    if (onSelect) onSelect(idx);
   }
   function pdist() { const p = [...pointers.values()]; return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); }
   function pmid() { const p = [...pointers.values()]; return { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 }; }
@@ -2045,6 +2268,7 @@ const collageMode = (function () {
       const cells = state.collage.cells;
       const t = cells[gesture.idx]; cells[gesture.idx] = cells[hoverTarget]; cells[hoverTarget] = t;
       state.collage.selected = hoverTarget;
+      if (onSelect) onSelect(hoverTarget);
     }
     hoverTarget = -1; gesture = null;
     if (state.mode === "collage") renderer.draw();
@@ -2059,7 +2283,44 @@ const collageMode = (function () {
     stage.addEventListener("pointercancel", onUp);
   }
 
-  return { bind, ensureCells, assignSources, drawPreview, drawComposite, ratioNums };
+  // Apply a grid or template from the visual picker (mirrors chip-click mutations).
+  function setLayout(opt) {
+    const co = state.collage;
+    undo.begin();
+    if (opt && opt.template) { co.template = opt.template; }
+    else { co.template = null; co.rows = opt.rows; co.cols = opt.cols; }
+    assignSources(); renderer.draw();
+    sessionStore.scheduleMeta();
+    undo.commit();
+  }
+  // Assign a specific source into the currently-selected cell (SCRL tap-to-fill).
+  function assignToCell(srcId) {
+    const co = state.collage; ensureCells();
+    const cell = co.cells[co.selected]; if (!cell) return;
+    undo.begin();
+    cell.srcId = srcId; cell.zoom = 1; cell.cx = 0.5; cell.cy = 0.5;
+    renderer.draw();
+    sessionStore.scheduleMeta();
+    undo.commit();
+  }
+  function setOnSelect(fn) { onSelect = fn; }
+  function selectedSrcId() { const c = state.collage.cells[state.collage.selected]; return c ? c.srcId : null; }
+
+  // Render a specific collage slide's composite into a canvas by temporarily
+  // pointing state.collage at that slide's settings (drawComposite reads it).
+  function compositeInto(cv, src, Cw, Ch) {
+    const prev = state.collage;
+    state.collage = src.collage;
+    try { drawComposite(cv.getContext("2d"), Cw, Ch); }
+    finally { state.collage = prev; }
+  }
+  function collageDims(src, wBase) {
+    const r = geometryCore.parseRatio((src.collage && src.collage.ratio) || "1:1", 1, 1);
+    const W = wBase, H = Math.round(W * (r.h / r.w));
+    return { W, H };
+  }
+
+  return { bind, ensureCells, assignSources, drawPreview, drawComposite, ratioNums, setLayout, assignToCell, setOnSelect, selectedSrcId, compositeInto, collageDims };
 })();
 
 /* ===========================================================================
@@ -2074,8 +2335,8 @@ const carouselMode = (function () {
   let drag = null; // { lastX }
 
   // tileW: 1080 for IG (equal tiles → perfect seam), 1440 for hi-res.
-  function composite() {
-    const c = state.carousel, N = c.n;
+  function composite(c) {
+    c = c || state.carousel; const N = c.n;
     const r = geometryCore.parseRatio(c.tileRatio, 1, 1);
     const tileW = state.exportOpt.ig ? CONFIG.IG_WIDTH : 1440;
     const Hc = Math.round(tileW * (r.h / r.w));
@@ -2088,8 +2349,8 @@ const carouselMode = (function () {
   //  cover → a crop box (computeCropBoxLocked) with the composite's aspect, so
   //          zoom/cx/cy choose what's framed. fit → contained + letterboxed.
   //  `eff` is the effective drawable ({bitmap,w,h}) — cropped if a crop exists.
-  function mapping(eff, Wc, Hc) {
-    const c = state.carousel;
+  function mapping(eff, Wc, Hc, c) {
+    c = c || state.carousel;
     if (c.fill === "fit") {
       return { mode: "fit", comp: geometryCore.computeFillRect(eff.w, eff.h, Wc, Hc, "fit") };
     }
@@ -2237,7 +2498,8 @@ const carouselMode = (function () {
   function onUp(e) {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinchPrev = 0;
-    if (drag) { drag = null; state.carousel.pos = Math.round(state.carousel.pos); renderer.draw(); }
+    // #2: no snap-to-tile — leave pos wherever the finger released it (free scroll).
+    if (drag) { drag = null; renderer.draw(); }
     sessionStore.scheduleMeta();
     if (pointers.size === 0) undo.commit();
   }
@@ -2289,7 +2551,34 @@ const carouselMode = (function () {
     }
   }
 
-  return { bind, drawPreview, exportTiles, carouselFiles, composite, mapping, drawTile, syncPosition };
+  // Compose the N carousel tiles for ANY source + its own settings (not just the
+  // active one). Returns raw {blob,w,h} in posting order — the flatten exporter
+  // names them. Reuses the tested composite/mapping/drawTile path.
+  async function tilesFor(src, c) {
+    if (!src) return [];
+    c = c || state.carousel;
+    const eff = renderer.effective(src);
+    const { N, Hc, Wc, b } = composite(c);
+    const map = mapping(eff, Wc, Hc, c);
+    const opt = state.exportOpt;
+    const type = opt.format === "png" ? "image/png" : "image/jpeg";
+    const quality = opt.format === "png" ? undefined : opt.quality;
+    const out = [];
+    for (let k = 0; k < N; k++) {
+      const w = b[k + 1] - b[k];
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = Hc;
+      const ctx = cv.getContext("2d", { alpha: opt.format === "png" });
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+      drawTile(ctx, k, eff, map, b, Wc, Hc, { x: 0, y: 0, w, h: Hc });
+      const blob = await new Promise((res) => cv.toBlob(res, type, quality));
+      out.push({ blob, w, h: Hc });
+      cv.width = 0; cv.height = 0; // release each before the next
+    }
+    return out;
+  }
+
+  return { bind, drawPreview, exportTiles, carouselFiles, composite, mapping, drawTile, syncPosition, tilesFor };
 })();
 
 const ui = (function () {
@@ -2302,6 +2591,14 @@ const ui = (function () {
 
   function applyStrings() {
     document.getElementById("appTitle").textContent = STRINGS.appTitle;
+    document.getElementById("postTitle").textContent = STRINGS.postTitle;
+    { const pe = document.getElementById("postExport"); if (pe) pe.textContent = STRINGS.exportPost;
+      const ps = document.getElementById("postSave"); if (ps) ps.textContent = STRINGS.save; }
+    document.getElementById("layoutTitle").textContent = STRINGS.layoutTitle;
+    document.getElementById("lblChooseLayout").textContent = STRINGS.chooseLayout;
+    document.getElementById("lpGridTitle").textContent = STRINGS.lpGrid;
+    document.getElementById("lpTplTitle").textContent = STRINGS.lpLayouts;
+    document.getElementById("labCellFill").textContent = STRINGS.cellFill;
     document.getElementById("emptyHint").innerHTML = STRINGS.emptyTitle + "<br>" + STRINGS.emptySub;
     document.getElementById("btnImport").textContent = STRINGS.import;
     document.getElementById("dropHint").textContent = STRINGS.dropHint;
@@ -2787,7 +3084,12 @@ const ui = (function () {
     await renderer.useActive();
     refreshFilmstrip();
     updateExportNote();
-    if (state.mode === "crop") syncCropControls();
+    const a = renderer.activeSource();
+    if (a && (state.mode === "frame" || state.mode === "carousel" || state.mode === "collage")) {
+      setMode(a.kind || "frame"); // adopt this slide's treatment + sync its controls
+    } else if (state.mode === "crop") {
+      syncCropControls();
+    }
     sessionStore.scheduleMeta();
   }
 
@@ -2811,15 +3113,22 @@ const ui = (function () {
 
   function setMode(mode) {
     state.mode = mode;
+    // Phase C2: frame/carousel are per-slide treatments — remember this slide's kind.
+    if (mode === "frame" || mode === "carousel" || mode === "collage") { const a = renderer.activeSource(); if (a) a.kind = mode; }
     document.querySelectorAll(".mode").forEach((b) =>
       b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
     document.getElementById("sheetFrame").classList.toggle("hidden", mode !== "frame");
     document.getElementById("sheetCrop").classList.toggle("hidden", mode !== "crop");
     document.getElementById("sheetCollage").classList.toggle("hidden", mode !== "collage");
     document.getElementById("sheetCarousel").classList.toggle("hidden", mode !== "carousel");
-    if (mode === "frame") { updateExportNote(); renderer.draw(); }
+    if (mode === "frame") { syncFrameControlsFromState(); updateExportNote(); renderer.draw(); }
     else if (mode === "crop") { syncCropControls(); renderer.draw(); }
-    else if (mode === "collage") { collageMode.ensureCells(); syncCollageControls(); renderer.draw(); }
+    else if (mode === "collage") {
+      const a = renderer.activeSource();
+      collageMode.ensureCells();
+      if (a && state.collage.cells.length && !state.collage.cells.some((c) => c.srcId)) state.collage.cells[0].srcId = a.id;
+      syncCollageControls(); renderer.draw(); layoutPicker.refreshCellFill();
+    }
     else if (mode === "carousel") {
       state.carousel.pos = 0;
       pressGroup("#adjustSeg button", "adj", state.carousel.adjust);
@@ -3052,7 +3361,7 @@ const ui = (function () {
     document.getElementById("histClear").addEventListener("click", async () => { try { await historyStore.clear(); } catch (_) {} renderHistory(); });
   }
 
-  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged };
+  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged, syncCollageControls };
 })();
 
 /* ===========================================================================
@@ -3136,7 +3445,7 @@ const pwa = (function () {
 
   function installManifest() {
     const manifest = {
-      name: "Studio Foto — Bingkai", short_name: "Bingkai",
+      name: "Bingkai", short_name: "Bingkai",
       start_url: ".", scope: ".", display: "standalone",
       background_color: "#1C1C1C", theme_color: "#2A2A2A", lang: "id",
       icons: [
@@ -3265,12 +3574,22 @@ const sessionStore = (function () {
   function buildMeta() {
     const co = state.collage, c = state.carousel;
     const crops = {};
-    state.sources.forEach((s) => { if (s.crop) crops[s.id] = s.crop; });
+    const frames = {};
+    const carousels = {};
+    const collages = {};
+    const kinds = {};
+    state.sources.forEach((s) => {
+      if (s.crop) crops[s.id] = s.crop;
+      if (s.frame) frames[s.id] = s.frame;
+      if (s.carousel) carousels[s.id] = s.carousel;
+      if (s.collage) collages[s.id] = s.collage;
+      if (s.kind) kinds[s.id] = s.kind;
+    });
     return {
       order: state.sources.map((s) => s.id),
       activeId: state.activeId,
       mode: state.mode,
-      crops,
+      crops, frames, carousels, collages, kinds,
       collage: { rows: co.rows, cols: co.cols, template: co.template, ratio: co.ratio, gutterPct: co.gutterPct, marginPct: co.marginPct, gutterColor: co.gutterColor, cells: co.cells, selected: co.selected },
       carousel: { n: c.n, tileRatio: c.tileRatio, fill: c.fill, adjust: c.adjust, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy },
       exportSeq: state.exportSeq || 0,
@@ -3297,6 +3616,13 @@ const sessionStore = (function () {
       try { await importer.restoreSource(rec, crops[id] || null); } catch (e) { console.warn("restore source failed", id, e); }
     }
     if (!state.sources.length) return false;
+    const frames = meta.frames || {}, carousels = meta.carousels || {}, kinds = meta.kinds || {}, collages = meta.collages || {};
+    state.sources.forEach((s) => {
+      if (frames[s.id]) s.frame = cloneFrame(frames[s.id]);
+      if (carousels[s.id]) s.carousel = cloneCarousel(carousels[s.id]);
+      if (collages[s.id]) s.collage = cloneCollage(collages[s.id]);
+      if (kinds[s.id]) s.kind = kinds[s.id];
+    });
     if (meta.collage) Object.assign(state.collage, meta.collage);
     if (meta.carousel) Object.assign(state.carousel, meta.carousel);
     if (typeof meta.exportSeq === "number") state.exportSeq = meta.exportSeq;
@@ -3368,12 +3694,274 @@ const undo = (function () {
 })();
 
 
+/* ===========================================================================
+ * postModel — pure logic for the assembled post (ordered slides). Node-tested
+ * (postModel.test.js: 14 assertions). A carousel slide expands to N export
+ * images; flatten() produces the final IG ordering, positionLabel() numbers
+ * slides accounting for carousels ahead of them.
+ * ======================================================================== */
+const postModel = (function () {
+  function slideOutputCount(s) { return s.kind === "carousel" ? Math.max(1, (s.carousel && s.carousel.n) || 1) : 1; }
+  function totalOutputs(slides) { return slides.reduce((n, s) => n + slideOutputCount(s), 0); }
+  function flatten(slides) {
+    const out = [];
+    for (const s of slides) { const n = slideOutputCount(s); for (let k = 0; k < n; k++) out.push({ slideId: s.id, kind: s.kind, sub: k, of: n }); }
+    return out;
+  }
+  function reorder(slides, from, to) {
+    const a = slides.slice();
+    if (from < 0 || from >= a.length) return a;
+    to = Math.max(0, Math.min(a.length - 1, to));
+    const [it] = a.splice(from, 1); a.splice(to, 0, it); return a;
+  }
+  function positionLabel(slides, idx) {
+    let start = 1;
+    for (let i = 0; i < idx; i++) start += slideOutputCount(slides[i]);
+    const n = slideOutputCount(slides[idx]);
+    return n === 1 ? String(start) : (start + "\u2013" + (start + n - 1));
+  }
+  // Phase C: read each source's own kind + settings (frame default). A collage
+  // slide consumes its non-primary cell photos, which are hidden from the list.
+  function deriveFrameSlides(sources) {
+    const consumed = new Set();
+    sources.forEach((s) => {
+      if (s.kind === "collage" && s.collage && s.collage.cells) {
+        s.collage.cells.forEach((c) => { if (c.srcId && c.srcId !== s.id) consumed.add(c.srcId); });
+      }
+    });
+    return sources.filter((s) => !consumed.has(s.id))
+      .map((s) => ({ id: s.id, kind: s.kind || "frame", srcId: s.id, carousel: s.carousel, collage: s.collage }));
+  }
+  return { slideOutputCount, totalOutputs, flatten, reorder, positionLabel, deriveFrameSlides };
+})();
+
+
+/* ===========================================================================
+ * postPreview — the SCRL-style assembled-post view: a horizontal, free-scroll
+ * (no snap) strip of real composite thumbnails, drag-to-reorder by handle.
+ * Phase B: slides ≡ sources, so a reorder mutates state.sources directly.
+ * ======================================================================== */
+const postPreview = (function () {
+  const backdrop = document.getElementById("postModal");
+  const strip = document.getElementById("postStrip");
+  const sub = document.getElementById("postSub");
+  let slides = [];
+
+  // Render one slide to a real composite thumbnail (reuses compositor).
+  function renderThumb(slide, targetH) {
+    const src = state.sources.find((s) => s.id === slide.srcId);
+    if (!src) return null;
+    const eff = renderer.effective(src);
+    if (slide.kind === "collage") {
+      const d = collageMode.collageDims(src, 1000);
+      const H = targetH, W = Math.max(1, Math.round(H * (d.W / d.H)));
+      const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+      collageMode.compositeInto(cv, src, W, H);
+      return cv;
+    }
+    if (slide.kind === "carousel") {
+      const c = src.carousel || state.carousel;
+      const r = geometryCore.parseRatio(c.tileRatio, eff.w, eff.h);
+      const H = targetH, W = Math.max(1, Math.round(H * (r.w / r.h)));
+      const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+      compositor.coverDraw(cv.getContext("2d"), eff.bitmap, eff.w, eff.h, W, H, 1);
+      return cv;
+    }
+    const f = src.frame || state.frame;
+    const r = compositor.frameRatio(f, eff.w, eff.h);
+    const H = targetH, W = Math.max(1, Math.round(H * (r.w / r.h)));
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    compositor.composeFrame(cv.getContext("2d"), eff.bitmap, eff.w, eff.h, W, H, f);
+    return cv;
+  }
+
+  function summary() {
+    const n = slides.length, imgs = postModel.totalOutputs(slides);
+    if (!n) return "";
+    const sW = n === 1 ? STRINGS.postSlide1 : STRINGS.postSlides;
+    const iW = imgs === 1 ? STRINGS.postImage1 : STRINGS.postImages;
+    return "<b>" + n + "</b> " + sW + " \u00b7 <b>" + imgs + "</b> " + iW + " \u00b7 " + STRINGS.postReorderHint;
+  }
+
+  function render() {
+    slides = postModel.deriveFrameSlides(state.sources);
+    strip.innerHTML = "";
+    const actions = document.getElementById("postActions");
+    if (!slides.length) {
+      sub.innerHTML = "";
+      if (actions) actions.style.display = "none";
+      const e = document.createElement("div"); e.className = "post-empty"; e.textContent = STRINGS.postEmpty;
+      strip.appendChild(e); return;
+    }
+    if (actions) actions.style.display = "";
+    sub.innerHTML = summary();
+    slides.forEach((sl, i) => {
+      const card = document.createElement("div");
+      card.className = "post-card"; card.dataset.idx = i;
+      const cv = renderThumb(sl, 200); if (cv) card.appendChild(cv);
+      const no = document.createElement("div"); no.className = "pc-no";
+      no.textContent = postModel.positionLabel(slides, i); card.appendChild(no);
+      const kind = document.createElement("div"); kind.className = "pc-kind";
+      kind.textContent = (STRINGS.modes && STRINGS.modes[sl.kind]) || sl.kind; card.appendChild(kind);
+      const h = document.createElement("div"); h.className = "pc-handle";
+      h.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>';
+      h.addEventListener("pointerdown", (ev) => startDrag(ev, i, card));
+      card.appendChild(h);
+      strip.appendChild(card);
+    });
+  }
+
+  // ---- drag reorder (handle-initiated; window listeners so it never drops the
+  // pointer; a caret marks the drop slot; commit on release) ----
+  let drag = null;
+  function startDrag(ev, idx, card) {
+    ev.preventDefault(); ev.stopPropagation();
+    const step = card.getBoundingClientRect().width + 12; // card width + strip gap
+    drag = { idx, card, startX: ev.clientX, target: idx, step };
+    card.classList.add("dragging");
+    window.addEventListener("pointermove", onDrag);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
+  }
+  function onDrag(ev) {
+    if (!drag) return;
+    const dx = ev.clientX - drag.startX;
+    drag.card.style.transform = "translateX(" + dx + "px)";
+    let t = drag.idx + Math.round(dx / drag.step);
+    t = Math.max(0, Math.min(slides.length - 1, t));
+    if (t !== drag.target) { drag.target = t; placeCaret(t); }
+  }
+  function placeCaret(t) {
+    let caret = strip.querySelector(".pc-caret");
+    if (t === drag.idx) { if (caret) caret.remove(); return; }
+    if (!caret) { caret = document.createElement("div"); caret.className = "pc-caret"; }
+    const cards = [...strip.querySelectorAll(".post-card")];
+    if (t > drag.idx) {
+      const after = cards[t];
+      if (after && after.nextSibling) strip.insertBefore(caret, after.nextSibling);
+      else strip.appendChild(caret);
+    } else {
+      strip.insertBefore(caret, cards[t]);
+    }
+  }
+  function endDrag() {
+    if (!drag) return;
+    window.removeEventListener("pointermove", onDrag);
+    window.removeEventListener("pointerup", endDrag);
+    window.removeEventListener("pointercancel", endDrag);
+    const from = drag.idx, to = drag.target;
+    const caret = strip.querySelector(".pc-caret"); if (caret) caret.remove();
+    drag.card.classList.remove("dragging"); drag.card.style.transform = "";
+    drag = null;
+    if (to !== from) commitReorder(from, to);
+  }
+  function commitReorder(from, to) {
+    undo.begin();
+    state.sources = postModel.reorder(state.sources, from, to);
+    ui.refreshFilmstrip();
+    sessionStore.scheduleMeta();
+    undo.commit();
+    render();
+  }
+
+  function open() { render(); backdrop.classList.add("show"); }
+  function close() { backdrop.classList.remove("show"); }
+  function bind() {
+    const b = document.getElementById("btnPost");
+    if (b) b.addEventListener("click", open);
+    document.getElementById("postClose").addEventListener("click", close);
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+    const ex = document.getElementById("postExport");
+    if (ex) ex.addEventListener("click", () => exporter.runPost());
+    const sv = document.getElementById("postSave");
+    if (sv) sv.addEventListener("click", () => exporter.savePost());
+  }
+  return { open, close, bind, render };
+})();
+
+
+/* ===========================================================================
+ * layoutPicker — #4: a visual grid/template chooser (SVG previews) that sits
+ * alongside the existing collage chips, plus a cell-fill row to drop a chosen
+ * photo into the selected collage cell (SCRL-style tap-to-fill).
+ * ======================================================================== */
+const layoutPicker = (function () {
+  const GRIDS = [
+    { rows: 1, cols: 2 }, { rows: 2, cols: 1 }, { rows: 2, cols: 2 },
+    { rows: 1, cols: 3 }, { rows: 3, cols: 1 }, { rows: 2, cols: 3 }, { rows: 3, cols: 2 },
+  ];
+  const backdrop = document.getElementById("layoutModal");
+  const fillWrap = document.getElementById("cellFillThumbs");
+
+  function gridRects(g) {
+    const out = [];
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++)
+      out.push({ x: c / g.cols, y: r / g.rows, w: 1 / g.cols, h: 1 / g.rows });
+    return out;
+  }
+  function svgFor(rects) {
+    const gap = 5;
+    const cells = rects.map((rc) => {
+      const x = rc.x * 100 + gap / 2, y = rc.y * 100 + gap / 2, w = rc.w * 100 - gap, h = rc.h * 100 - gap;
+      return '<rect class="lp-cell" x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="4"/>';
+    }).join("");
+    return '<svg viewBox="0 0 100 100" preserveAspectRatio="none">' + cells + "</svg>";
+  }
+  function build() {
+    const co = state.collage;
+    const gWrap = document.getElementById("lpGrid"); gWrap.innerHTML = "";
+    GRIDS.forEach((g) => {
+      const b = document.createElement("button"); b.className = "lp-tile";
+      b.innerHTML = svgFor(gridRects(g));
+      b.setAttribute("aria-pressed", String(!co.template && co.rows === g.rows && co.cols === g.cols));
+      b.addEventListener("click", () => { collageMode.setLayout({ rows: g.rows, cols: g.cols }); ui.syncCollageControls(); refreshCellFill(); close(); });
+      gWrap.appendChild(b);
+    });
+    const tWrap = document.getElementById("lpTemplates"); tWrap.innerHTML = "";
+    COLLAGE_TEMPLATES.forEach((t) => {
+      const b = document.createElement("button"); b.className = "lp-tile";
+      b.innerHTML = svgFor(t.cells);
+      b.setAttribute("aria-pressed", String(co.template === t.id));
+      b.addEventListener("click", () => { collageMode.setLayout({ template: t.id }); ui.syncCollageControls(); refreshCellFill(); close(); });
+      tWrap.appendChild(b);
+    });
+  }
+  // Thumbnails of every source; tap one to drop it into the selected cell.
+  function refreshCellFill() {
+    if (!fillWrap) return;
+    fillWrap.innerHTML = "";
+    const inCell = collageMode.selectedSrcId();
+    state.sources.forEach((s) => {
+      const b = document.createElement("button");
+      b.className = "cell-fill-thumb" + (s.id === inCell ? " in-cell" : "");
+      const img = document.createElement("img"); img.src = s.thumbUrl; img.alt = "";
+      b.appendChild(img);
+      b.addEventListener("click", () => { collageMode.assignToCell(s.id); refreshCellFill(); });
+      fillWrap.appendChild(b);
+    });
+  }
+  function open() { build(); backdrop.classList.add("show"); }
+  function close() { backdrop.classList.remove("show"); }
+  function bind() {
+    const b = document.getElementById("btnLayoutPicker");
+    if (b) b.addEventListener("click", open);
+    document.getElementById("layoutClose").addEventListener("click", close);
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) close(); });
+    collageMode.setOnSelect(() => refreshCellFill());
+  }
+  return { open, close, bind, build, refreshCellFill };
+})();
+
+
 async function boot() {
   persistence.loadSettings();   // restore last-used global settings before wiring UI
   let savedLang = "en";
   try { savedLang = localStorage.getItem("bingkai-lang") || "en"; } catch (_) {}
   ui.applyLang(savedLang);      // sets STRINGS + applies all UI text (default English)
   ui.bind();
+  postPreview.bind();
+  layoutPicker.bind();
   ui.syncFrameControlsFromState();
   ui.renderPresets();
   pwa.installManifest();
@@ -3398,7 +3986,7 @@ async function boot() {
 document.addEventListener("DOMContentLoaded", boot);
 
 // Expose a tiny hook so Playwright can drive imports without a real file dialog.
-window.__app = { state, importer, renderer, ui, exporter, compositor, cropMode, collageMode, carouselMode, persistence, sessionStore, undo, geometryCore, CONFIG };
+window.__app = { state, importer, renderer, ui, exporter, compositor, cropMode, collageMode, carouselMode, persistence, sessionStore, undo, geometryCore, CONFIG, postModel, postPreview, layoutPicker };
 </script>
 </body>
 </html>
