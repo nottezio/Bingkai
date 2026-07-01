@@ -418,6 +418,72 @@
   .mode[aria-selected="true"] { color: var(--accent); }
   .mode:disabled { opacity: .4; }
 
+  /* ---- Post overview (main slide-preview view) ---- */
+  .post-overview {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    background: var(--bg); z-index: 4;
+  }
+  .post-overview.show { display: flex; }
+  .po-head {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px 4px; color: var(--txt-dim); font-size: 12.5px;
+  }
+  .po-head b { color: var(--txt); font-weight: 650; }
+  .po-strip {
+    flex: 1 1 auto; display: flex; align-items: center; gap: 14px;
+    overflow-x: auto; overflow-y: hidden; padding: 8px 20px 20px;
+    scroll-snap-type: none; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  }
+  .po-strip::-webkit-scrollbar { display: none; }
+  .po-card {
+    position: relative; flex: 0 0 auto; height: min(74%, 560px);
+    border-radius: 10px; overflow: hidden; border: 2px solid transparent;
+    background: #0b0d10; cursor: pointer; box-shadow: 0 8px 28px rgba(0,0,0,.45);
+    transition: border-color .12s ease, box-shadow .12s ease;
+  }
+  .po-card.selected { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft), 0 8px 28px rgba(0,0,0,.45); }
+  .po-card canvas { height: 100%; width: auto; display: block; }
+  .po-card .po-num {
+    position: absolute; top: 8px; left: 8px; min-width: 20px; height: 20px; padding: 0 6px;
+    border-radius: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 11px; line-height: 20px;
+    text-align: center; font-weight: 700; backdrop-filter: blur(4px); font-variant-numeric: tabular-nums;
+  }
+  .po-card.selected .po-num { background: var(--accent); color: #08131f; }
+  .po-card .po-kind {
+    position: absolute; top: 8px; right: 8px; height: 20px; padding: 0 7px;
+    border-radius: 6px; background: rgba(0,0,0,.6); color: #fff; font-size: 10px; line-height: 20px;
+    text-transform: uppercase; letter-spacing: .04em; font-weight: 650; backdrop-filter: blur(4px);
+  }
+  .po-add {
+    flex: 0 0 auto; width: 96px; height: min(74%, 560px); border-radius: 10px;
+    border: 2px dashed var(--line); background: var(--panel);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--txt-dim); font-size: 40px; font-weight: 300; cursor: pointer;
+  }
+  .po-add:active { background: var(--panel-2); }
+  /* contextual action bar shown when a slide is selected */
+  .slide-actions {
+    flex: 0 0 auto; display: none; align-items: stretch; gap: 6px;
+    padding: 8px 10px calc(8px + var(--safe-b)); background: var(--ink);
+    border-top: 1px solid var(--line); z-index: 5;
+  }
+  .slide-actions.show { display: flex; }
+  .sa-btn {
+    flex: 1 1 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    background: none; border: none; cursor: pointer; color: var(--txt); font-size: 10.5px; font-weight: 600;
+    padding: 6px 2px; border-radius: 10px;
+  }
+  .sa-btn svg { width: 21px; height: 21px; }
+  .sa-btn:active { background: var(--panel-2); }
+  .sa-btn.danger { color: #ff6b6b; }
+  .sa-btn.primary { color: var(--accent); }
+  /* Done button in topbar (edit mode) */
+  .done-btn {
+    display: none; align-items: center; height: 34px; padding: 0 15px; border-radius: 17px;
+    background: var(--accent); color: #08131f; border: none; font-weight: 700; font-size: 13px; cursor: pointer;
+  }
+  .done-btn.show { display: inline-flex; }
+
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -426,6 +492,7 @@
   <div class="topbar">
     <span class="title" id="appTitle">Bingkai</span>
     <span class="spacer"></span>
+    <button class="done-btn" id="btnDone">Done</button>
     <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
     </button>
@@ -460,6 +527,14 @@
     </div>
 
     <div class="busy" id="busy"><div class="spinner"></div></div>
+
+    <div class="post-overview" id="postOverview">
+      <div class="po-head">
+        <span id="poHeadLeft"><b>Post</b> preview</span>
+        <span id="poHeadRight"></span>
+      </div>
+      <div class="po-strip" id="poStrip"></div>
+    </div>
   </div>
 
   <div class="dock hidden" id="dock">
@@ -706,6 +781,33 @@
     <button class="mode" data-mode="carousel" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="16" rx="1.5"/><path d="M3.5 8v8M20.5 8v8"/></svg>
       <span id="lblCarousel">Carousel</span>
+    </button>
+  </div>
+
+  <div class="slide-actions" id="slideActions">
+    <button class="sa-btn primary" data-act="crop">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      <span>Crop</span>
+    </button>
+    <button class="sa-btn primary" data-act="frame">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      <span>Frame</span>
+    </button>
+    <button class="sa-btn primary" data-act="collage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+      <span>Collage</span>
+    </button>
+    <button class="sa-btn primary" data-act="carousel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="16" rx="1.5"/><path d="M3.5 8v8M20.5 8v8"/></svg>
+      <span>Carousel</span>
+    </button>
+    <button class="sa-btn" data-act="dup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span>Duplicate</span>
+    </button>
+    <button class="sa-btn danger" data-act="delete">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      <span>Delete</span>
     </button>
   </div>
 </div>
@@ -2943,9 +3045,11 @@ const ui = (function () {
   }
 
   function bindCollageControls() {
-    const co = state.collage;
+    // NOTE: state.collage is repointed per-slide, so every handler must read it
+    // FRESH at click time — never capture it in the binder's closure.
     document.querySelectorAll("#gridChips .chip").forEach((c) =>
       c.addEventListener("click", () => {
+        const co = state.collage;
         undo.begin();
         co.template = null;
         co.rows = +c.dataset.rows; co.cols = +c.dataset.cols;
@@ -2963,6 +3067,7 @@ const ui = (function () {
       const b = document.createElement("button");
       b.className = "chip ghost"; b.dataset.tpl = t.id; b.textContent = t.label;
       b.addEventListener("click", () => {
+        const co = state.collage;
         undo.begin();
         co.template = t.id;
         document.querySelectorAll("#templateChips .chip").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
@@ -2975,32 +3080,32 @@ const ui = (function () {
     });
     document.querySelectorAll("#collageRatioChips .chip").forEach((c) =>
       c.addEventListener("click", () => {
-        co.ratio = c.dataset.ratio;
+        state.collage.ratio = c.dataset.ratio;
         pressGroup("#collageRatioChips .chip", "ratio", c.dataset.ratio);
         renderer.draw();
       }));
     const gr = document.getElementById("gutterRange");
     gr.addEventListener("input", () => {
-      co.gutterPct = +gr.value;
+      state.collage.gutterPct = +gr.value;
       document.getElementById("gutterVal").textContent = gr.value + "%";
       renderer.draw();
     });
     const cm = document.getElementById("colMarginRange");
     cm.addEventListener("input", () => {
-      co.marginPct = +cm.value;
+      state.collage.marginPct = +cm.value;
       document.getElementById("colMarginVal").textContent = cm.value + "%";
       renderer.draw();
     });
     document.querySelectorAll("#gutterSwatches .sw[data-color]").forEach((s) =>
       s.addEventListener("click", () => {
-        co.gutterColor = s.dataset.color;
+        state.collage.gutterColor = s.dataset.color;
         document.querySelectorAll("#gutterSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
         s.setAttribute("aria-pressed", "true");
         renderer.draw();
       }));
     const gcc = document.getElementById("gutterCustomColor");
     gcc.addEventListener("input", () => {
-      co.gutterColor = gcc.value;
+      state.collage.gutterColor = gcc.value;
       document.querySelectorAll("#gutterSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
       document.getElementById("gutterCustomSw").setAttribute("aria-pressed", "true");
       renderer.draw();
@@ -3010,34 +3115,35 @@ const ui = (function () {
   }
 
   function bindCarouselControls() {
-    const c = state.carousel;
+    // state.carousel is repointed per-slide → read it FRESH in every handler.
     const setTiles = (n) => {
+      const c = state.carousel;
       c.n = geometryCore.clamp(n, 2, 10);
       document.getElementById("tilesVal").textContent = String(c.n);
       c.pos = geometryCore.clamp(c.pos, 0, c.n - 1);
       renderer.draw();
     };
-    document.getElementById("tilesMinus").addEventListener("click", () => setTiles(c.n - 1));
-    document.getElementById("tilesPlus").addEventListener("click", () => setTiles(c.n + 1));
+    document.getElementById("tilesMinus").addEventListener("click", () => setTiles(state.carousel.n - 1));
+    document.getElementById("tilesPlus").addEventListener("click", () => setTiles(state.carousel.n + 1));
     document.querySelectorAll("#tileRatioChips .chip").forEach((b) =>
       b.addEventListener("click", () => {
-        c.tileRatio = b.dataset.ratio;
+        state.carousel.tileRatio = b.dataset.ratio;
         pressGroup("#tileRatioChips .chip", "ratio", b.dataset.ratio);
         renderer.draw();
       }));
     document.querySelectorAll("#fillSeg button").forEach((b) =>
       b.addEventListener("click", () => {
-        c.fill = b.dataset.fill;
+        state.carousel.fill = b.dataset.fill;
         pressGroup("#fillSeg button", "fill", b.dataset.fill);
-        document.getElementById("adjustSeg").style.display = c.fill === "cover" ? "" : "none";
+        document.getElementById("adjustSeg").style.display = state.carousel.fill === "cover" ? "" : "none";
         renderer.draw();
       }));
     document.querySelectorAll("#adjustSeg button").forEach((b) =>
       b.addEventListener("click", () => {
-        c.adjust = b.dataset.adj;
+        state.carousel.adjust = b.dataset.adj;
         pressGroup("#adjustSeg button", "adj", b.dataset.adj);
         document.getElementById("carouselHint").textContent =
-          c.adjust === "browse" ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
+          state.carousel.adjust === "browse" ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
         sessionStore.scheduleMeta();
       }));
     document.getElementById("btnCarouselExport").addEventListener("click", () => carouselMode.exportTiles());
@@ -3070,9 +3176,7 @@ const ui = (function () {
     const has = state.sources.length > 0;
     empty.classList.toggle("hidden", has);
     document.getElementById("stage").style.display = has ? "block" : "none";
-    document.getElementById("dock").classList.toggle("hidden", !has);
-    document.getElementById("toolbar").classList.toggle("hidden", !has);
-    document.getElementById("sheetHandle").classList.toggle("hidden", !has);
+    postView.sync(); // owns dock/toolbar/overview/actions/done visibility per view
   }
 
   function updateBatchBtn() {
@@ -3170,6 +3274,35 @@ const ui = (function () {
   }
 
   function openPicker() { picker.value = ""; picker.click(); }
+
+  // Duplicate a slide: re-decode from its blob (own bitmaps) then copy its settings.
+  async function duplicateSlide(id) {
+    const src = state.sources.find((s) => s.id === id);
+    if (!src || !src.blob) { toast(STRINGS.dupFail || "Cannot duplicate"); return; }
+    setBusy(true);
+    try {
+      await importer.importFiles([src.blob]);
+      const dup = state.sources[state.sources.length - 1];
+      if (!dup) return;
+      dup.frame = cloneFrame(src.frame);
+      dup.carousel = cloneCarousel(src.carousel);
+      dup.collage = cloneCollage(src.collage);
+      dup.kind = src.kind;
+      dup.crop = src.crop ? Object.assign({}, src.crop) : null;
+      // place the duplicate immediately after the original
+      const from = state.sources.indexOf(dup);
+      let to = state.sources.indexOf(src) + 1;
+      if (from > -1 && to > -1 && to <= from) { state.sources.splice(to, 0, state.sources.splice(from, 1)[0]); }
+      if (dup.crop && !isIdentityCropSafe(dup.crop)) { try { await renderer.bakeCrop(dup); } catch (_) {} }
+      state.activeId = dup.id;
+      await renderer.useActive();
+      refreshFilmstrip();
+      sessionStore.scheduleMeta();
+    } finally { setBusy(false); }
+  }
+  function isIdentityCropSafe(c) {
+    return !c || (c.ratio === "original" && (c.zoom || 1) === 1 && (c.cx ?? 0.5) === 0.5 && (c.cy ?? 0.5) === 0.5 && !c.flip && !c.rotate);
+  }
 
   function setMode(mode) {
     state.mode = mode;
@@ -3422,7 +3555,7 @@ const ui = (function () {
     document.getElementById("histClear").addEventListener("click", async () => { try { await historyStore.clear(); } catch (_) {} renderHistory(); });
   }
 
-  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged, syncCollageControls };
+  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged, syncCollageControls, removeSource, openPicker, duplicateSlide };
 })();
 
 /* ===========================================================================
@@ -3938,7 +4071,7 @@ const postPreview = (function () {
     const sv = document.getElementById("postSave");
     if (sv) sv.addEventListener("click", () => exporter.savePost());
   }
-  return { open, close, bind, render };
+  return { open, close, bind, render, renderThumb };
 })();
 
 
@@ -4015,6 +4148,113 @@ const layoutPicker = (function () {
 })();
 
 
+// ---- postView: the main slide-preview (overview) + contextual slide actions ----
+const postView = (function () {
+  let selectedId = null;
+
+  function slidesList() { return postModel.deriveFrameSlides(state.sources); }
+
+  function renderOverview() {
+    const strip = document.getElementById("poStrip");
+    if (!strip) return;
+    const slides = slidesList();
+    strip.innerHTML = "";
+    slides.forEach((sl, i) => {
+      const card = document.createElement("div");
+      card.className = "po-card" + (sl.srcId === selectedId ? " selected" : "");
+      card.dataset.id = sl.srcId;
+      let cv = null;
+      try { cv = postPreview.renderThumb(sl, 560); } catch (_) {}
+      if (cv) card.appendChild(cv);
+      const num = document.createElement("div");
+      num.className = "po-num"; num.textContent = String(i + 1);
+      card.appendChild(num);
+      if (sl.kind && sl.kind !== "frame") {
+        const k = document.createElement("div");
+        k.className = "po-kind";
+        k.textContent = sl.kind === "carousel" ? ("Carousel \u00d7" + postModel.slideOutputCount(sl)) : "Collage";
+        card.appendChild(k);
+      }
+      strip.appendChild(card);
+    });
+    const add = document.createElement("div");
+    add.className = "po-add"; add.textContent = "+";
+    add.addEventListener("click", () => ui.openPicker());
+    strip.appendChild(add);
+    const total = postModel.totalOutputs(slides);
+    const right = document.getElementById("poHeadRight");
+    if (right) right.textContent = slides.length + (slides.length === 1 ? " slide" : " slides") + " \u00b7 " + total + " image" + (total === 1 ? "" : "s");
+  }
+
+  async function selectCard(id) {
+    selectedId = id;
+    await ui.setActive(id);
+    document.getElementById("slideActions").classList.add("show");
+    renderOverview();
+    const el = document.querySelector('#poStrip .po-card[data-id="' + id + '"]');
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }
+
+  function enterEdit(mode) {
+    if (!selectedId) return;
+    state.view = "edit";
+    ui.setMode(mode); // sets kind (frame/collage/carousel), shows that sheet, draws the slide
+    sync();
+  }
+
+  function exitEdit() {
+    state.view = "overview";
+    sync();
+  }
+
+  function doDelete() {
+    if (!selectedId) return;
+    const id = selectedId; selectedId = null;
+    ui.removeSource(id);
+    sync();
+  }
+
+  async function doDup() {
+    if (!selectedId) return;
+    await ui.duplicateSlide(selectedId);
+    selectedId = state.activeId;
+    sync();
+  }
+
+  function sync() {
+    if (!state.view) state.view = "overview";
+    const has = state.sources.length > 0;
+    const editing = state.view === "edit";
+    const ov = has && !editing;
+    if (selectedId && !state.sources.some((s) => s.id === selectedId)) selectedId = null;
+    document.getElementById("postOverview").classList.toggle("show", ov);
+    document.getElementById("dock").classList.toggle("hidden", !(has && editing));
+    document.getElementById("toolbar").classList.toggle("hidden", !(has && editing));
+    document.getElementById("sheetHandle").classList.toggle("hidden", !(has && editing));
+    document.getElementById("btnDone").classList.toggle("show", has && editing);
+    document.getElementById("slideActions").classList.toggle("show", ov && !!selectedId);
+    if (ov) renderOverview();
+  }
+
+  function bind() {
+    document.getElementById("slideActions").addEventListener("click", (e) => {
+      const b = e.target.closest(".sa-btn"); if (!b) return;
+      const act = b.dataset.act;
+      if (act === "crop" || act === "frame" || act === "collage" || act === "carousel") enterEdit(act);
+      else if (act === "delete") doDelete();
+      else if (act === "dup") doDup();
+    });
+    document.getElementById("btnDone").addEventListener("click", exitEdit);
+    document.getElementById("poStrip").addEventListener("click", (e) => {
+      const card = e.target.closest(".po-card");
+      if (card) selectCard(card.dataset.id);
+    });
+  }
+
+  return { bind, sync, renderOverview, exitEdit };
+})();
+
+
 async function boot() {
   persistence.loadSettings();   // restore last-used global settings before wiring UI
   let savedLang = "en";
@@ -4022,6 +4262,7 @@ async function boot() {
   ui.applyLang(savedLang);      // sets STRINGS + applies all UI text (default English)
   ui.bind();
   postPreview.bind();
+  postView.bind();
   layoutPicker.bind();
   ui.syncFrameControlsFromState();
   ui.renderPresets();
