@@ -11,7 +11,7 @@
  */
 'use strict';
 
-const CACHE = 'bingkai-v2';
+const CACHE = 'bingkai-v3';
 const SHELL = ['./', './index.html'];
 const JSZIP = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 
