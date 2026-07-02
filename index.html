@@ -484,6 +484,24 @@
   }
   .done-btn.show { display: inline-flex; }
 
+  /* Export/Save now live in the header (main page) only */
+  #btnExport, #btnSave, #btnExportAll, #btnCropExport, #btnCropSave,
+  #btnCollageExport, #btnCollageSave, #btnCarouselExport, #btnCarouselSave,
+  #frameExportRow, #collageExportRow { display: none !important; }
+  /* Edit dock shows only the chosen tool — slide switching happens on the overview */
+  #filmstrip, #slideContext, #toolbar { display: none !important; }
+  #gridChips, #templateChips { display: none !important; }
+  #btnAddTop { display: none !important; }
+  /* contextual action-bar group divider */
+  .sa-div { flex: 0 0 auto; width: 1px; align-self: center; height: 32px; background: var(--line); margin: 0 3px; }
+  /* header export button (accent-highlighted) */
+  .exp-btn {
+    display: none; align-items: center; gap: 6px; height: 34px; padding: 0 15px; border-radius: 17px;
+    background: var(--accent); color: #08131f; border: none; font-weight: 750; font-size: 13px; cursor: pointer;
+  }
+  .exp-btn.show { display: inline-flex; }
+  .exp-btn svg { width: 16px; height: 16px; }
+
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 </head>
@@ -493,6 +511,10 @@
     <span class="title" id="appTitle">Bingkai</span>
     <span class="spacer"></span>
     <button class="done-btn" id="btnDone">Done</button>
+    <button class="exp-btn" id="btnExportPost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>
+      <span id="lblExportPost">Export</span>
+    </button>
     <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
     </button>
@@ -618,7 +640,7 @@
       </div>
     </div>
 
-    <div class="export-row">
+    <div class="export-row" id="frameExportRow">
       <button class="btn-primary" id="btnExport">Ekspor</button>
       <button class="chip ghost" id="btnSave" style="padding:13px 16px">Simpan</button>
       <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Semua</button>
@@ -673,22 +695,8 @@
       <div class="lab"><span id="labCellFill">Fill selected cell</span></div>
       <div class="cell-fill-thumbs" id="cellFillThumbs"></div>
     </div>
-    <div class="row">
-      <div class="lab"><span id="labGrid">Kisi</span></div>
-      <div class="chips" id="gridChips">
-        <button class="chip" data-rows="1" data-cols="2">1×2</button>
-        <button class="chip" data-rows="2" data-cols="1">2×1</button>
-        <button class="chip" data-rows="2" data-cols="2" aria-pressed="true">2×2</button>
-        <button class="chip" data-rows="1" data-cols="3">1×3</button>
-        <button class="chip" data-rows="3" data-cols="1">3×1</button>
-        <button class="chip" data-rows="2" data-cols="3">2×3</button>
-        <button class="chip" data-rows="3" data-cols="2">3×2</button>
-      </div>
-    </div>
-    <div class="row">
-      <div class="lab"><span id="labTemplate">Tata letak</span></div>
-      <div class="chips" id="templateChips"></div>
-    </div>
+    <div class="chips" id="gridChips" hidden></div>
+    <div class="chips" id="templateChips" hidden></div>
     <div class="row">
       <div class="lab"><span id="labColRatio">Rasio</span></div>
       <div class="chips" id="collageRatioChips">
@@ -716,7 +724,7 @@
       </div>
     </div>
     <div class="note" id="collageHint"></div>
-    <div class="export-row">
+    <div class="export-row" id="collageExportRow">
       <button class="btn-primary" id="btnCollageExport">Ekspor</button>
       <button class="chip ghost" id="btnCollageSave" style="padding:13px 16px">Simpan</button>
     </div>
@@ -793,6 +801,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
       <span>Frame</span>
     </button>
+    <span class="sa-div" aria-hidden="true"></span>
     <button class="sa-btn primary" data-act="collage">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
       <span>Collage</span>
@@ -877,7 +886,7 @@
 <div class="modal-backdrop" id="postModal">
   <div class="modal post-modal" role="dialog" aria-modal="true">
     <div class="modal-head">
-      <h2 id="postTitle">Your post</h2>
+      <h2 id="postTitle">Reorder slides</h2>
       <button class="close-x" id="postClose" aria-label="Tutup">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
@@ -967,7 +976,7 @@ const STRINGS_EN = {
   save: "Save", preview: "Preview", all: "All", rotate90: "Rotate 90\u00b0", layout: "Layout",
   interaction: "Interaction", adjMove: "Reposition", adjBrowse: "Preview tiles",
   portrait: "Portrait", landscape: "Landscape",
-  postTitle: "Your post", postEmpty: "No photos yet \u2014 import some to start your post.",
+  postTitle: "Reorder slides", postEmpty: "No photos yet \u2014 import some to start your post.",
   postSlides: "slides", postSlide1: "slide", postImages: "images", postImage1: "image",
   postReorderHint: "Drag the handle to reorder.",
   exportPost: "Export post",
@@ -1029,7 +1038,7 @@ const STRINGS_ID = {
   save: "Simpan", preview: "Pratinjau", all: "Semua", rotate90: "Putar 90\u00b0", layout: "Tata letak",
   interaction: "Interaksi", adjMove: "Atur posisi", adjBrowse: "Pratinjau tile",
   portrait: "Potret", landscape: "Lanskap",
-  postTitle: "Post kamu", postEmpty: "Belum ada foto \u2014 impor dulu untuk memulai post.",
+  postTitle: "Susun ulang slide", postEmpty: "Belum ada foto \u2014 impor dulu untuk memulai post.",
   postSlides: "slide", postSlide1: "slide", postImages: "gambar", postImage1: "gambar",
   postReorderHint: "Seret gagang untuk mengurutkan.",
   exportPost: "Ekspor post",
@@ -1235,7 +1244,7 @@ const state = {
   mode: "frame",
   work: null,         // { id, bitmap(downscaled), w, h } — current preview bitmap
   frame: {
-    ratio: "4:5",
+    ratio: "original",
     flip: false,        // landscape orientation for the chosen ratio
     marginPct: 4,
     frameColor: "#FFFFFF",
@@ -1972,6 +1981,9 @@ const cropMode = (function () {
   }
 
   async function applyChange() {
+    // Keep the slide's display ratio locked to the crop: the overview/frame must
+    // follow the cropped aspect, otherwise a 3:2 crop shows inside a 4:5 card.
+    if (state.frame) state.frame.ratio = "original";
     await renderer.bakeCropActive();
     renderer.draw();
     ui.refreshFilmstrip();
@@ -2761,7 +2773,6 @@ const ui = (function () {
     document.getElementById("btnCropReset").textContent = STRINGS.reset;
     document.getElementById("btnCropExport").textContent = STRINGS.exportBtn;
     document.getElementById("cropExportNote").textContent = STRINGS.cropExportNote;
-    document.getElementById("labGrid").textContent = STRINGS.grid;
     document.getElementById("labColRatio").textContent = STRINGS.ratio;
     document.getElementById("labGutter").textContent = STRINGS.gutter;
     document.getElementById("labColMargin").textContent = STRINGS.outerMargin;
@@ -4159,12 +4170,14 @@ const postView = (function () {
     if (!strip) return;
     const slides = slidesList();
     strip.innerHTML = "";
+    // Render cards at device pixel density so they're crisp (not upscaled/blurry).
+    const H = Math.round(Math.min(1280, 560 * Math.max(2, Math.min(3, window.devicePixelRatio || 2))));
     slides.forEach((sl, i) => {
       const card = document.createElement("div");
       card.className = "po-card" + (sl.srcId === selectedId ? " selected" : "");
       card.dataset.id = sl.srcId;
       let cv = null;
-      try { cv = postPreview.renderThumb(sl, 560); } catch (_) {}
+      try { cv = postPreview.renderThumb(sl, H); } catch (_) {}
       if (cv) card.appendChild(cv);
       const num = document.createElement("div");
       num.className = "po-num"; num.textContent = String(i + 1);
@@ -4198,12 +4211,16 @@ const postView = (function () {
   function enterEdit(mode) {
     if (!selectedId) return;
     state.view = "edit";
+    document.body.classList.remove("sheets-collapsed"); // expand the tool sheet
     ui.setMode(mode); // sets kind (frame/collage/carousel), shows that sheet, draws the slide
     sync();
   }
 
-  function exitEdit() {
+  async function exitEdit() {
     state.view = "overview";
+    // WYSIWYG guarantee: ensure the active slide's crop is baked before the
+    // overview renders, so the card can never show a stale croppedBitmap.
+    try { if (renderer.bakeCropActive) await renderer.bakeCropActive(); } catch (_) {}
     sync();
   }
 
@@ -4232,6 +4249,10 @@ const postView = (function () {
     document.getElementById("toolbar").classList.toggle("hidden", !(has && editing));
     document.getElementById("sheetHandle").classList.toggle("hidden", !(has && editing));
     document.getElementById("btnDone").classList.toggle("show", has && editing);
+    document.getElementById("btnExportPost").classList.toggle("show", ov);
+    // Declutter the header: reorder + history are overview concerns
+    document.getElementById("btnPost").style.display = editing ? "none" : "";
+    document.getElementById("btnHistory").style.display = editing ? "none" : "";
     document.getElementById("slideActions").classList.toggle("show", ov && !!selectedId);
     if (ov) renderOverview();
   }
@@ -4245,6 +4266,8 @@ const postView = (function () {
       else if (act === "dup") doDup();
     });
     document.getElementById("btnDone").addEventListener("click", exitEdit);
+    const ep = document.getElementById("btnExportPost");
+    if (ep) ep.addEventListener("click", () => exporter.runPost());
     document.getElementById("poStrip").addEventListener("click", (e) => {
       const card = e.target.closest(".po-card");
       if (card) selectCard(card.dataset.id);
@@ -4255,6 +4278,68 @@ const postView = (function () {
 })();
 
 
+// Sliders: the native range updates its value from its OWN internal pointer
+// handling, which touch-event preventDefault can't suppress — that's why the
+// earlier touch approach still slid. Fundamental fix: make the input render-only
+// (pointer-events:none) and drive it via a transparent overlay that owns the
+// gesture. A drag starting on the thumb ("ball") adjusts; anywhere else scrolls.
+function hardenRanges() {
+  const HIT = 28; // px hit radius around the thumb centre
+  const scrollParent = (el) => {
+    let n = el.parentElement;
+    while (n) {
+      const s = getComputedStyle(n);
+      if (/(auto|scroll)/.test(s.overflowY) && n.scrollHeight > n.clientHeight + 2) return n;
+      n = n.parentElement;
+    }
+    return document.scrollingElement || document.documentElement;
+  };
+  document.querySelectorAll('input[type="range"]').forEach((r) => {
+    if (r.dataset.hardened) return;
+    r.dataset.hardened = "1";
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "position:relative;";
+    r.parentNode.insertBefore(wrap, r);
+    wrap.appendChild(r);
+    r.style.pointerEvents = "none"; // native range never processes touches now
+    const ov = document.createElement("div");
+    ov.style.cssText = "position:absolute;left:0;right:0;top:-10px;bottom:-10px;touch-action:none;z-index:2;";
+    wrap.appendChild(ov);
+
+    const nums = () => ({ min: parseFloat(r.min) || 0, max: parseFloat(r.max || "100"), step: parseFloat(r.step || "1") || 1 });
+    const thumbX = () => {
+      const rect = r.getBoundingClientRect(); const { min, max } = nums();
+      const frac = max > min ? (parseFloat(r.value) - min) / (max - min) : 0;
+      return rect.left + HIT / 2 + frac * (rect.width - HIT);
+    };
+    const setFromX = (clientX) => {
+      const rect = r.getBoundingClientRect(); if (!rect.width) return;
+      const { min, max, step } = nums();
+      let frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      let v = Math.round((min + frac * (max - min)) / step) * step;
+      v = Math.max(min, Math.min(max, v));
+      if (String(v) !== r.value) { r.value = String(v); r.dispatchEvent(new Event("input", { bubbles: true })); }
+    };
+
+    let onBall = false, sy = 0, scroller = null, active = false;
+    ov.addEventListener("pointerdown", (e) => {
+      active = true; sy = e.clientY; scroller = scrollParent(wrap);
+      onBall = Math.abs(e.clientX - thumbX()) <= HIT;
+      try { ov.setPointerCapture(e.pointerId); } catch (_) {}
+      if (onBall) setFromX(e.clientX);
+    });
+    ov.addEventListener("pointermove", (e) => {
+      if (!active) return;
+      if (onBall) setFromX(e.clientX);
+      else if (scroller) { scroller.scrollTop -= (e.clientY - sy); sy = e.clientY; }
+    });
+    const end = () => { active = false; onBall = false; };
+    ov.addEventListener("pointerup", end);
+    ov.addEventListener("pointercancel", end);
+  });
+}
+
+
 async function boot() {
   persistence.loadSettings();   // restore last-used global settings before wiring UI
   let savedLang = "en";
@@ -4263,6 +4348,7 @@ async function boot() {
   ui.bind();
   postPreview.bind();
   postView.bind();
+  hardenRanges();
   layoutPicker.bind();
   ui.syncFrameControlsFromState();
   ui.renderPresets();
