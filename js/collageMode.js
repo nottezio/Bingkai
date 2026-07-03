@@ -317,7 +317,14 @@ export const collageMode = (function () {
   function setLayout(opt) {
     const co = state.collage;
     undo.begin();
-    if (opt && opt.template) { co.template = opt.template; }
+    // These two layout modes are mutually exclusive (uniform grid vs. asymmetric
+    // template) — clearing the other's fields whenever one is set means no
+    // consumer can ever read stale rows/cols for a template (or a stale
+    // template id for a grid). Previously only the grid branch cleared
+    // `template`; the template branch left rows/cols untouched, so any code
+    // trusting state.collage.rows/cols while a template was active (e.g. cell
+    // hit-testing) silently computed against the wrong shape.
+    if (opt && opt.template) { co.template = opt.template; co.rows = null; co.cols = null; }
     else { co.template = null; co.rows = opt.rows; co.cols = opt.cols; }
     assignSources(); renderer.draw();
     sessionStore.scheduleMeta();

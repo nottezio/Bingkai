@@ -103,6 +103,7 @@ export const ui = (function () {
     document.documentElement.lang = LANG;
     document.title = STRINGS.docTitle;
     updateExportNote();
+    updateStatusMarquee();
   }
 
   function applyLang(lang) {
@@ -506,6 +507,20 @@ export const ui = (function () {
     empty.classList.toggle("hidden", has);
     document.getElementById("stage").style.display = has ? "block" : "none";
     postView.sync(); // owns dock/toolbar/overview/actions/done visibility per view
+    updateStatusMarquee();
+  }
+
+  // Signature ticker: real app state, not decorative filler text. Repeated
+  // twice back-to-back so the scroll loop has no visible seam.
+  function updateStatusMarquee() {
+    const track = document.getElementById("statusMarqueeTrack");
+    if (!track) return;
+    const n = state.sources.length;
+    const slides = postModel.deriveFrameSlides(state.sources).length;
+    const msg = n === 0
+      ? STRINGS.marqueeEmpty
+      : STRINGS.marqueeStats.replace("{slides}", slides).replace("{sources}", n);
+    track.textContent = msg + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0" + msg + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0";
   }
 
   function updateBatchBtn() {

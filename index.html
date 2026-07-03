@@ -7,22 +7,26 @@
 <link rel="icon" href="data:," />
 <title>Bingkai</title>
 <!--
-  SCRL-style Photo Framing & Carousel PWA — single file, Android-first.
-  Build phase: P2 (app shell · import · two-resolution pipeline · EXIF orientation).
+  SCRL-style Photo Framing & Carousel PWA — modular ES modules, offline-first PWA.
+  UI: 90s/Windows-95 retro design system (deliberate CDN exception for webfont —
+  see Architecture Defaults; app logic remains vanilla JS/no-build, offline-capable).
   Code + comments: English. User-facing strings: Bahasa Indonesia (STRINGS).
-  Dependencies: none yet (JSZip arrives in P5; service worker in P6).
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
 <div id="app">
   <div class="topbar">
-    <span class="title" id="appTitle">Bingkai</span>
+    <span class="title text-rainbow" id="appTitle">BINGKAI</span>
     <span class="spacer"></span>
     <button class="done-btn" id="btnDone">Done</button>
     <button class="exp-btn" id="btnExportPost">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>
       <span id="lblExportPost">Export</span>
+      <span class="badge-new badge-pulse">NEW!</span>
     </button>
     <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
@@ -42,6 +46,10 @@
     <button class="icon-btn" id="btnAddTop" aria-label="Tambah foto">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
     </button>
+  </div>
+
+  <div class="marquee bevel-in" id="statusMarquee" aria-hidden="true">
+    <span class="marquee-track" id="statusMarqueeTrack"></span>
   </div>
 
   <div class="stage-wrap">
@@ -140,7 +148,7 @@
       <button class="chip ghost" id="btnSave" style="padding:13px 16px">Simpan</button>
       <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Semua</button>
     </div>
-    <div class="note" id="exportNote"></div>
+    <div class="note status-bar" id="exportNote"></div>
 
     <div class="row" id="presetsRow" style="margin-top:14px">
       <div class="lab"><span id="labPresets">Preset</span><button class="chip" id="btnSavePreset" style="padding:5px 11px">+ Simpan</button></div>
@@ -358,6 +366,11 @@
         <button data-m="seq" id="nameModeSeq">Urutan</button>
       </div>
       <div class="name-preview" id="namePreview"></div>
+    </div>
+    <div class="color-squares" aria-hidden="true">
+      <span style="background:#FF0000"></span><span style="background:#00FF00"></span>
+      <span style="background:#0000FF"></span><span style="background:#FFFF00"></span>
+      <span style="background:#FF00FF"></span><span style="background:#00FFFF"></span>
     </div>
   </div>
 </div>

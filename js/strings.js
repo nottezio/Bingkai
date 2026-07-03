@@ -1,5 +1,7 @@
 export const STRINGS_EN = {
   appTitle: "Bingkai", docTitle: "Bingkai",
+  marqueeEmpty: "WELCOME TO BINGKAI \u2014 ADD YOUR FIRST PHOTO TO GET STARTED",
+  marqueeStats: "BINGKAI STATUS: {slides} SLIDE(S) \u00b7 {sources} PHOTO(S) LOADED \u00b7 READY TO EXPORT",
   modes: { frame: "Frame", crop: "Crop", collage: "Collage", carousel: "Carousel" },
   emptyTitle: "No slides yet.",
   emptySub: "Add your first slide to start your post.",
@@ -64,6 +66,8 @@ export const STRINGS_EN = {
 
 export const STRINGS_ID = {
   appTitle: "Bingkai", docTitle: "Bingkai",
+  marqueeEmpty: "SELAMAT DATANG DI BINGKAI \u2014 TAMBAHKAN FOTO PERTAMA UNTUK MULAI",
+  marqueeStats: "STATUS BINGKAI: {slides} SLIDE \u00b7 {sources} FOTO DIMUAT \u00b7 SIAP EKSPOR",
   modes: { frame: "Bingkai", crop: "Potong", collage: "Kolase", carousel: "Carousel" },
   emptyTitle: "Belum ada slide.",
   emptySub: "Tambah slide pertama untuk memulai post.",

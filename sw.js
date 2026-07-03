@@ -11,11 +11,14 @@
  * new index.html on top of old modules (new buttons, old logic). This version
  * removes that footgun.
  *
- * The JSZip CDN URL is versioned/immutable, so it stays cache-first.
+ * The JSZip CDN URL is versioned/immutable, so it stays cache-first. The
+ * Archivo Black webfont (Google Fonts, added for the 90s UI) is also
+ * cross-origin/cache-first; if blocked, the CSS font-stack falls back to
+ * Impact/Arial Black/system sans, so the app still renders.
  */
 'use strict';
 
-const CACHE = 'bingkai-v5';
+const CACHE = 'bingkai-v6';
 const SHELL = [
   './', './index.html', './css/app.css',
   './js/main.js', './js/carouselMode.js', './js/collageMode.js',
@@ -82,7 +85,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cross-origin immutable assets (versioned JSZip CDN): cache-first is safe.
+  // Cross-origin immutable assets (JSZip CDN, Google Fonts): cache-first is safe.
   event.respondWith((async () => {
     const cached = await caches.match(req);
     if (cached) return cached;
