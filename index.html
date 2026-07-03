@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#2A2A2A" />
+<link rel="icon" href="data:," />
+<title>Bingkai</title>
+<!--
+  SCRL-style Photo Framing & Carousel PWA — single file, Android-first.
+  Build phase: P2 (app shell · import · two-resolution pipeline · EXIF orientation).
+  Code + comments: English. User-facing strings: Bahasa Indonesia (STRINGS).
+  Dependencies: none yet (JSZip arrives in P5; service worker in P6).
+-->
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <span class="title" id="appTitle">Bingkai</span>
+    <span class="spacer"></span>
+    <button class="done-btn" id="btnDone">Done</button>
+    <button class="exp-btn" id="btnExportPost">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>
+      <span id="lblExportPost">Export</span>
+    </button>
+    <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
+    </button>
+    <button class="icon-btn" id="btnPost" aria-label="Preview post">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="13" height="14" rx="2"/><path d="M19 8v9a2 2 0 0 1-2 2H8"/></svg>
+    </button>
+    <button class="icon-btn" id="btnHistory" aria-label="Riwayat ekspor">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>
+    </button>
+    <button class="icon-btn" id="btnSettings" aria-label="Pengaturan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+    <button class="icon-btn" id="btnInstall" style="display:none" aria-label="Pasang aplikasi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 4 5-4M5 21h14"/></svg>
+    </button>
+    <button class="icon-btn" id="btnAddTop" aria-label="Tambah foto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+
+  <div class="stage-wrap">
+  <div class="workspace" id="workspace">
+    <canvas id="stage"></canvas>
+
+    <div class="empty" id="empty">
+      <div class="drop" id="dropzone">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>
+        <div class="hint" id="emptyHint">No slides yet.<br>Add your first slide to start your post.</div>
+        <button class="btn-primary" id="btnImport">Add First Slide</button>
+        <div class="hint" id="dropHint" style="opacity:.7">atau seret &amp; lepas ke sini</div>
+      </div>
+    </div>
+
+    <div class="busy" id="busy"><div class="spinner"></div></div>
+
+    <div class="post-overview" id="postOverview">
+      <div class="po-head">
+        <span id="poHeadLeft"><b>Post</b> preview</span>
+        <span id="poHeadRight"></span>
+      </div>
+      <div class="po-strip" id="poStrip"></div>
+    </div>
+  </div>
+
+  <div class="dock hidden" id="dock">
+  <div class="sheet-handle hidden" id="sheetHandle">
+    <span class="grip"></span>
+  </div>
+  <div class="dock-body" id="dockBody">
+  <div class="slide-context hidden" id="slideContext">
+    <span class="sc-pos" id="scPos"></span>
+    <span class="sc-type" id="scType"></span>
+  </div>
+  <div class="filmstrip hidden" id="filmstrip"></div>
+
+  <div class="sheet hidden" id="sheetFrame">
+    <div class="row">
+      <div class="lab"><span id="labRatio">Rasio</span></div>
+      <div class="chips" id="ratioChips">
+        <button class="chip" data-ratio="1:1">1:1</button>
+        <button class="chip" data-ratio="4:5" aria-pressed="true">4:5</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="9:16">9:16</button>
+        <button class="chip" data-ratio="16:9">16:9</button>
+        <button class="chip" data-ratio="3:2">3:2</button>
+        <button class="chip" data-ratio="original" id="chipOriginal">Asli</button>
+      </div>
+    </div>
+
+    <div class="row" id="frameOrientRow" style="display:none">
+      <button class="icon-toggle" id="btnFrameOrient" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a9 9 0 0 0-15-3L3 8"/><path d="M3 3v5h5"/><path d="M3 16a9 9 0 0 0 15 3l3-3"/><path d="M21 21v-5h-5"/></svg>
+        <span id="frameOrientLabel">Potret</span>
+      </button>
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labMargin">Margin</span><span id="marginVal">4%</span></div>
+      <input type="range" id="marginRange" min="0" max="25" step="1" value="4" />
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labBg">Latar belakang</span></div>
+      <div class="seg" id="bgSeg">
+        <button data-bg="solid" aria-pressed="true" id="bgSolid">Warna</button>
+        <button data-bg="blur" id="bgBlur">Blur</button>
+      </div>
+    </div>
+
+    <div class="row" id="blurRow" style="display:none">
+      <div class="lab"><span id="labBlur">Kekuatan blur</span><span id="blurVal">5%</span></div>
+      <input type="range" id="blurRange" min="2" max="14" step="1" value="5" />
+    </div>
+
+    <div class="row" id="frameColorRow">
+      <div class="lab"><span id="labFrameColor">Warna bingkai</span></div>
+      <div class="swatches" id="frameSwatches">
+        <button class="sw" data-color="#FFFFFF" style="background:#fff" aria-pressed="true"></button>
+        <button class="sw" data-color="#000000" style="background:#000"></button>
+        <button class="sw" data-color="#F2EDE4" style="background:#F2EDE4"></button>
+        <button class="sw custom" id="customSw"><input type="color" id="customColor" value="#cccccc" /></button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labExportSize">Ukuran ekspor</span></div>
+      <div class="seg" id="sizeSeg">
+        <button data-ig="1" aria-pressed="true" id="sizeIG">Instagram 1080</button>
+        <button data-ig="0" id="sizeHi">Resolusi tinggi</button>
+      </div>
+    </div>
+
+    <div class="row" id="qualityRow">
+      <div class="lab"><span id="labQuality">Kualitas JPEG</span><span id="qualityVal">92</span></div>
+      <input type="range" id="qualityRange" min="70" max="95" step="1" value="92" />
+    </div>
+
+    <div class="row">
+      <div class="lab"><span id="labFormat">Format</span></div>
+      <div class="seg" id="formatSeg">
+        <button data-fmt="jpeg" aria-pressed="true" id="fmtJpeg">JPEG (foto)</button>
+        <button data-fmt="png" id="fmtPng">PNG (desain)</button>
+      </div>
+    </div>
+
+    <div class="export-row" id="frameExportRow">
+      <button class="btn-primary" id="btnExport">Ekspor</button>
+      <button class="chip ghost" id="btnSave" style="padding:13px 16px">Simpan</button>
+      <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Semua</button>
+    </div>
+    <div class="note" id="exportNote"></div>
+
+    <div class="row" id="presetsRow" style="margin-top:14px">
+      <div class="lab"><span id="labPresets">Preset</span><button class="chip" id="btnSavePreset" style="padding:5px 11px">+ Simpan</button></div>
+      <div class="chips" id="presetChips"></div>
+    </div>
+  </div>
+
+  <div class="sheet hidden" id="sheetCrop">
+    <div class="row">
+      <div class="lab"><span id="labCropRatio">Rasio</span><span id="cropHint" style="opacity:.7"></span></div>
+      <div class="chips" id="cropRatioChips">
+        <button class="chip" data-ratio="1:1">1:1</button>
+        <button class="chip" data-ratio="4:5" aria-pressed="true">4:5</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="9:16">9:16</button>
+        <button class="chip" data-ratio="16:9">16:9</button>
+        <button class="chip" data-ratio="3:2">3:2</button>
+        <button class="chip" data-ratio="original" id="cropChipOriginal">Asli</button>
+      </div>
+    </div>
+    <div class="row" id="cropToolsRow" style="display:flex; gap:9px; flex-wrap:wrap">
+      <button class="icon-toggle" id="btnCropRotate" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9a9 9 0 0 1 15-3l3 3"/><path d="M21 3v6h-6"/></svg>
+        <span id="lblCropRotate">Putar 90°</span>
+      </button>
+      <button class="icon-toggle" id="btnCropOrient" type="button" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a9 9 0 0 0-15-3L3 8"/><path d="M3 3v5h5"/><path d="M3 16a9 9 0 0 0 15 3l3-3"/><path d="M21 21v-5h-5"/></svg>
+        <span id="cropOrientLabel">Potret</span>
+      </button>
+    </div>
+    <div class="export-row">
+      <button class="chip ghost" id="btnCropReset" style="padding:13px 16px">Atur ulang</button>
+      <button class="btn-primary" id="btnCropExport">Ekspor</button>
+      <button class="chip ghost" id="btnCropSave" style="padding:13px 16px">Simpan</button>
+    </div>
+    <div class="note" id="cropExportNote"></div>
+  </div>
+
+  <div class="sheet hidden" id="sheetCollage">
+    <div class="row">
+      <button class="btn-layout" id="btnLayoutPicker" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span id="lblChooseLayout">Choose a layout</span>
+      </button>
+    </div>
+    <div class="row" id="cellFillRow">
+      <div class="lab"><span id="labCellFill">Fill selected cell</span></div>
+      <div class="cell-fill-thumbs" id="cellFillThumbs"></div>
+    </div>
+    <div class="chips" id="gridChips" hidden></div>
+    <div class="chips" id="templateChips" hidden></div>
+    <div class="row">
+      <div class="lab"><span id="labColRatio">Rasio</span></div>
+      <div class="chips" id="collageRatioChips">
+        <button class="chip" data-ratio="1:1" aria-pressed="true">1:1</button>
+        <button class="chip" data-ratio="4:5">4:5</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="16:9">16:9</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labGutter">Jarak</span><span id="gutterVal">2%</span></div>
+      <input type="range" id="gutterRange" min="0" max="10" step="1" value="2" />
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labColMargin">Margin luar</span><span id="colMarginVal">0%</span></div>
+      <input type="range" id="colMarginRange" min="0" max="10" step="1" value="0" />
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labGutterColor">Warna jarak</span></div>
+      <div class="swatches" id="gutterSwatches">
+        <button class="sw" data-color="#FFFFFF" style="background:#fff" aria-pressed="true"></button>
+        <button class="sw" data-color="#000000" style="background:#000"></button>
+        <button class="sw" data-color="#F2EDE4" style="background:#F2EDE4"></button>
+        <button class="sw custom" id="gutterCustomSw"><input type="color" id="gutterCustomColor" value="#cccccc" /></button>
+      </div>
+    </div>
+    <div class="note" id="collageHint"></div>
+    <div class="export-row" id="collageExportRow">
+      <button class="btn-primary" id="btnCollageExport">Ekspor</button>
+      <button class="chip ghost" id="btnCollageSave" style="padding:13px 16px">Simpan</button>
+    </div>
+  </div>
+
+  <div class="sheet hidden" id="sheetCarousel">
+    <div class="row">
+      <div class="lab"><span id="labTiles">Jumlah tile</span><span id="tilesVal">3</span></div>
+      <div class="seg" id="tilesStepper">
+        <button id="tilesMinus" style="font-size:18px;padding:6px 16px">\u2212</button>
+        <button id="tilesPlus" style="font-size:18px;padding:6px 16px">+</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labTileRatio">Rasio tile</span></div>
+      <div class="chips" id="tileRatioChips">
+        <button class="chip" data-ratio="4:5" aria-pressed="true">4:5</button>
+        <button class="chip" data-ratio="1:1">1:1</button>
+        <button class="chip" data-ratio="3:4">3:4</button>
+        <button class="chip" data-ratio="9:16">9:16</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="lab"><span id="labFill">Pengisian</span></div>
+      <div class="seg" id="fillSeg">
+        <button data-fill="cover" aria-pressed="true" id="fillCover">Penuh</button>
+        <button data-fill="fit" id="fillFit">Muat</button>
+      </div>
+    </div>
+    <div class="row" id="carouselAdjustRow">
+      <div class="lab"><span id="labAdjust">Interaksi</span></div>
+      <div class="seg" id="adjustSeg">
+        <button data-adj="move" aria-pressed="true" id="adjMove">Atur posisi</button>
+        <button data-adj="browse" id="adjBrowse">Pratinjau tile</button>
+      </div>
+    </div>
+    <div class="note" id="carouselHint"></div>
+    <div class="export-row">
+      <button class="btn-primary" id="btnCarouselExport">Ekspor</button>
+      <button class="chip ghost" id="btnCarouselPreview" style="padding:13px 16px">Pratinjau</button>
+      <button class="chip ghost" id="btnCarouselSave" style="padding:13px 16px">Simpan</button>
+    </div>
+    <div class="note" id="carouselNote"></div>
+  </div>
+  </div><!-- /dock-body -->
+  </div><!-- /dock -->
+  </div><!-- /stage-wrap -->
+
+  <div class="toolbar" id="toolbar">
+    <button class="mode" data-mode="frame" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      <span id="lblFrame">Bingkai</span>
+    </button>
+    <button class="mode" data-mode="crop" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      <span id="lblCrop">Potong</span>
+    </button>
+    <button class="mode" data-mode="collage" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+      <span id="lblCollage">Kolase</span>
+    </button>
+    <button class="mode" data-mode="carousel" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="16" rx="1.5"/><path d="M3.5 8v8M20.5 8v8"/></svg>
+      <span id="lblCarousel">Carousel</span>
+    </button>
+  </div>
+
+  <div class="slide-actions" id="slideActions">
+    <button class="sa-btn primary" data-act="crop">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M2 6h14a2 2 0 0 1 2 2v14"/></svg>
+      <span>Crop</span>
+    </button>
+    <button class="sa-btn primary" data-act="frame">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+      <span>Frame</span>
+    </button>
+    <span class="sa-div" aria-hidden="true"></span>
+    <button class="sa-btn primary" data-act="collage">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+      <span>Collage</span>
+    </button>
+    <button class="sa-btn primary" data-act="carousel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="16" rx="1.5"/><path d="M3.5 8v8M20.5 8v8"/></svg>
+      <span>Carousel</span>
+    </button>
+    <button class="sa-btn" data-act="dup">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      <span>Duplicate</span>
+    </button>
+    <button class="sa-btn danger" data-act="delete">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      <span>Delete</span>
+    </button>
+  </div>
+</div>
+
+<input id="filePicker" class="sr-only" type="file" accept="image/*" multiple />
+
+<div class="modal-backdrop" id="historyModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="historyTitle">Riwayat ekspor</h2>
+      <button class="close-x" id="historyClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="histList"></div>
+    <div class="hist-empty" id="histEmpty">Belum ada ekspor.</div>
+    <button class="chip ghost" id="histClear" style="margin-top:12px; display:none">Hapus semua</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="settingsModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="settingsTitle">Pengaturan</h2>
+      <button class="close-x" id="settingsClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="field">
+      <label id="lblLanguage">Language</label>
+      <div class="seg" id="langSeg">
+        <button data-lang="en" id="langEn">English</button>
+        <button data-lang="id" id="langId">Bahasa Indonesia</button>
+      </div>
+    </div>
+    <div class="field">
+      <label id="lblNamePrefix">Awalan nama ekspor</label>
+      <input type="text" id="namePrefix" maxlength="40" placeholder="bingkai" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label id="lblNameMode">Penomoran</label>
+      <div class="seg" id="nameModeSeg">
+        <button data-m="date" id="nameModeDate">Tanggal/waktu</button>
+        <button data-m="seq" id="nameModeSeq">Urutan</button>
+      </div>
+      <div class="name-preview" id="namePreview"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="previewModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="previewTitle">Pratinjau ekspor</h2>
+      <button class="close-x" id="previewClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="pv-grid" id="pvGrid"></div>
+    <div class="pv-actions">
+      <button class="btn-primary" id="pvShare">Ekspor</button>
+      <button class="chip ghost" id="pvSave" style="padding:13px 16px">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="postModal">
+  <div class="modal post-modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="postTitle">Reorder slides</h2>
+      <button class="close-x" id="postClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="post-sub" id="postSub"></div>
+    <div class="post-strip" id="postStrip"></div>
+    <div class="pv-actions" id="postActions">
+      <button class="btn-primary" id="postExport">Export post</button>
+      <button class="chip ghost" id="postSave" style="padding:13px 16px">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="exportModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="exportTitle">Export post</h2>
+      <button class="close-x" id="exportClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="exp-section">
+      <div class="exp-label" id="expDestLabel">Destination</div>
+      <div class="exp-opts" id="expDest">
+        <button class="exp-opt" data-dest="instagram" aria-pressed="true">
+          <div class="exp-opt-t" id="expDestIgT">Share to Instagram</div>
+          <div class="exp-opt-s" id="expDestIgS">Opens the share sheet</div>
+        </button>
+        <button class="exp-opt" data-dest="device" aria-pressed="false">
+          <div class="exp-opt-t" id="expDestDvT">Save to device</div>
+          <div class="exp-opt-s" id="expDestDvS">Download the images</div>
+        </button>
+      </div>
+    </div>
+    <div class="exp-section">
+      <div class="exp-label" id="expQualLabel">Quality</div>
+      <div class="exp-opts" id="expQual">
+        <button class="exp-opt" data-q="ig" aria-pressed="true">
+          <div class="exp-opt-t" id="expQIgT">Instagram optimal</div>
+          <div class="exp-opt-s" id="expQIgS">1080px wide · JPEG 90%</div>
+        </button>
+        <button class="exp-opt" data-q="high" aria-pressed="false">
+          <div class="exp-opt-t" id="expQHiT">High</div>
+          <div class="exp-opt-s" id="expQHiS">1080px wide · JPEG 95%</div>
+        </button>
+        <button class="exp-opt" data-q="max" aria-pressed="false">
+          <div class="exp-opt-t" id="expQMxT">Maximum</div>
+          <div class="exp-opt-s" id="expQMxS">Full resolution · JPEG 100%</div>
+        </button>
+      </div>
+    </div>
+    <div class="pv-actions">
+      <button class="chip ghost" id="exportCancel" style="padding:13px 16px">Cancel</button>
+      <button class="btn-primary" id="exportGo">Export</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="layoutModal">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h2 id="layoutTitle">Choose a layout</h2>
+      <button class="close-x" id="layoutClose" aria-label="Tutup">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="lp-section-title" id="lpGridTitle">Grid</div>
+    <div class="lp-grid" id="lpGrid"></div>
+    <div class="lp-section-title" id="lpTplTitle">Layouts</div>
+    <div class="lp-grid" id="lpTemplates"></div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
