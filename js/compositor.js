@@ -11,6 +11,14 @@ export const compositor = (function () {
 
   // Returns the geometryCore layout it used (so callers/tests can verify).
   function composeFrame(ctx, bmp, bw, bh, Cw, Ch, f) {
+    // Framing OFF → raw (cropped) image, edge to edge. frameRatio() has already
+    // made Cw:Ch equal the image aspect, so there are no bars/background at all.
+    if (f && f.enabled === false) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bmp, 0, 0, Cw, Ch);
+      return { draw: { x: 0, y: 0, w: Cw, h: Ch } };
+    }
     if (f.bg === "blur") {
       const r = Math.max(1, Math.round(Math.min(Cw, Ch) * (f.blurStrength || 0.05)));
       ctx.save();
@@ -40,6 +48,7 @@ export const compositor = (function () {
 
   // Frame output ratio, honoring the orientation flip for non-square ratios.
   function frameRatio(f, w, h) {
+    if (f && f.enabled === false) return geometryCore.parseRatio("original", w, h);
     const r = geometryCore.parseRatio(f.ratio, w, h);
     if (f.flip && f.ratio !== "original" && r.w !== r.h) return { w: r.h, h: r.w };
     return r;

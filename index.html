@@ -81,6 +81,13 @@
 
   <div class="sheet hidden" id="sheetFrame">
     <div class="row">
+      <div class="lab"><span id="labFrameEnable">Bingkai</span></div>
+      <div class="seg" id="frameEnableSeg">
+        <button data-en="0" aria-pressed="true" id="frameEnableOff">Nonaktif</button>
+        <button data-en="1" id="frameEnableOn">Aktif</button>
+      </div>
+    </div>
+    <div class="row" id="frameRatioRow">
       <div class="lab"><span id="labRatio">Rasio</span></div>
       <div class="chips" id="ratioChips">
         <button class="chip" data-ratio="1:1">1:1</button>
@@ -100,12 +107,12 @@
       </button>
     </div>
 
-    <div class="row">
+    <div class="row" id="marginRow">
       <div class="lab"><span id="labMargin">Margin</span><span id="marginVal">4%</span></div>
       <input type="range" id="marginRange" min="0" max="25" step="1" value="4" />
     </div>
 
-    <div class="row">
+    <div class="row" id="bgRow">
       <div class="lab"><span id="labBg">Latar belakang</span></div>
       <div class="seg" id="bgSeg">
         <button data-bg="solid" aria-pressed="true" id="bgSolid">Warna</button>
@@ -444,6 +451,19 @@
         <button class="exp-opt" data-q="max" aria-pressed="false">
           <div class="exp-opt-t" id="expQMxT">Maximum</div>
           <div class="exp-opt-s" id="expQMxS">Full resolution · JPEG 100%</div>
+        </button>
+      </div>
+    </div>
+    <div class="exp-section" id="expPackSection">
+      <div class="exp-label" id="expPackLabel">Files</div>
+      <div class="exp-opts" id="expPack">
+        <button class="exp-opt" data-pack="zip" aria-pressed="true">
+          <div class="exp-opt-t" id="expPackZipT">Single ZIP</div>
+          <div class="exp-opt-s" id="expPackZipS">One .zip archive</div>
+        </button>
+        <button class="exp-opt" data-pack="separate" aria-pressed="false">
+          <div class="exp-opt-t" id="expPackSepT">Separate files</div>
+          <div class="exp-opt-s" id="expPackSepS">One download per image</div>
         </button>
       </div>
     </div>

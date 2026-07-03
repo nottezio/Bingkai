@@ -90,6 +90,7 @@ const results=[]; const rec=(name,ok,detail)=>{results.push({name,ok});console.l
     await page.waitForSelector('#slideActions.show',{timeout:5000});
     await page.click('#slideActions .sa-btn[data-act="frame"]');  // enter frame edit -> marginRange laid out
     await page.waitForFunction(()=>window.__app.state.view==='edit',null,{timeout:5000});
+    await page.evaluate(()=>{const b=document.getElementById('frameEnableOn');if(b)b.click();}); // framing is opt-in; enable to reveal margin/bg rows
     await page.waitForFunction(()=>{const r=document.getElementById('marginRange');return r&&r.getBoundingClientRect().width>10;},null,{timeout:5000});
     const sl=await page.evaluate(()=>{
       const r=document.getElementById('marginRange');

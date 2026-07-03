@@ -8,6 +8,7 @@ export const undo = (function () {
   const MAX = 25;
   const stack = [];
   let pending = null;
+  let commitTimer = null;
 
   function snap() {
     return JSON.stringify({
@@ -17,8 +18,17 @@ export const undo = (function () {
       crops: state.sources.map((s) => ({ id: s.id, crop: s.crop })),
     });
   }
-  function begin() { pending = snap(); }
+  // Idempotent: the first begin of an interaction snapshots the pre-edit state;
+  // later begins (e.g. a per-handler begin nested inside a centralized capture)
+  // must NOT clobber it, or a coalesced drag would lose its starting point.
+  function begin() { if (pending === null) pending = snap(); }
+  // Debounced commit for continuous controls (sliders): one undo entry per drag.
+  function schedule(delay) {
+    clearTimeout(commitTimer);
+    commitTimer = setTimeout(commit, delay == null ? 350 : delay);
+  }
   function commit() {
+    clearTimeout(commitTimer); commitTimer = null;
     if (pending && pending !== snap()) {
       stack.push(pending);
       if (stack.length > MAX) stack.shift();
@@ -48,5 +58,5 @@ export const undo = (function () {
     sessionStore.scheduleMeta();
   }
 
-  return { begin, commit, pop, canUndo };
+  return { begin, commit, schedule, pop, canUndo };
 })();

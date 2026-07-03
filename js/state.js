@@ -4,6 +4,7 @@ export const state = {
   mode: "frame",
   work: null,         // { id, bitmap(downscaled), w, h } — current preview bitmap
   frame: {
+    enabled: false,     // master switch — off = export the raw (cropped) image, no frame
     ratio: "original",
     flip: false,        // landscape orientation for the chosen ratio
     marginPct: 0,       // 0 = no frame by default; framing is opt-in via the Frame tab
@@ -46,14 +47,18 @@ export const nextId = () => "src_" + (++_idSeq);
 export const bumpIdSeq = (n) => { if (Number.isFinite(n) && n > _idSeq) _idSeq = n; };
 // Per-slide frame settings snapshot (primitives only). Each source owns one;
 // selecting a source repoints state.frame at it (Phase C).
-export function cloneFrame(f) { return { ratio: f.ratio, flip: f.flip, marginPct: f.marginPct, frameColor: f.frameColor, bg: f.bg, blurStrength: f.blurStrength }; }
+export function cloneFrame(f) { return { enabled: !!f.enabled, ratio: f.ratio, flip: f.flip, marginPct: f.marginPct, frameColor: f.frameColor, bg: f.bg, blurStrength: f.blurStrength }; }
 // Per-slide carousel settings snapshot. Selecting a source repoints state.carousel at it.
 export function cloneCarousel(c) { return { n: c.n, tileRatio: c.tileRatio, fill: c.fill, adjust: c.adjust, pos: c.pos, zoom: c.zoom, cx: c.cx, cy: c.cy }; }
 // Per-slide collage settings (a collage slide owns its own subset of photos via its cells).
-export function cloneCollage(c) {
+// resetCells=true copies only the layout SETTINGS and starts with empty cells.
+// A newly imported photo must never inherit another slide's cell srcIds — that
+// is the root cause of "turning slide N into a collage shows slide 1's image".
+// Undo/duplicate/session-restore keep the default (cells preserved).
+export function cloneCollage(c, resetCells) {
   return {
     rows: c.rows, cols: c.cols, template: c.template, ratio: c.ratio,
     marginPct: c.marginPct, gutterPct: c.gutterPct, gutterColor: c.gutterColor, selected: 0,
-    cells: (c.cells || []).map((x) => ({ srcId: x.srcId, zoom: x.zoom, cx: x.cx, cy: x.cy })),
+    cells: resetCells ? [] : (c.cells || []).map((x) => ({ srcId: x.srcId, zoom: x.zoom, cx: x.cx, cy: x.cy })),
   };
 }

@@ -94,14 +94,22 @@ export const collageMode = (function () {
   }
 
   // Draw one cell's covered source region into destRect (current ctx space).
-  function drawCellInto(ctx, cell, destRect) {
+  // Top-right "×" hotspot for clearing a filled cell (editor only). Draw + hit
+  // test share this geometry so the target is always where it's shown.
+  function removeBadge(r) {
+    const rr = Math.max(11, Math.min(r.w, r.h) * 0.12);
+    return { cx: r.x + r.w - rr - rr * 0.35, cy: r.y + rr + rr * 0.35, rr };
+  }
+
+  function drawCellInto(ctx, cell, destRect, editing) {
     const s = sourceFor(cell.srcId);
     ctx.save();
     ctx.beginPath(); ctx.rect(destRect.x, destRect.y, destRect.w, destRect.h); ctx.clip();
     if (!s) {
       ctx.fillStyle = "#2a2f37"; ctx.fillRect(destRect.x, destRect.y, destRect.w, destRect.h);
-      // "+" affordance — only while editing the collage (never in cards/exports)
-      if (state.mode === "collage" && state.view === "edit") {
+      // "+" affordance — driven by an explicit editing flag from drawPreview, NOT a
+      // global (state.view was unreliable). Composites/cards pass editing=false.
+      if (editing) {
         const cx = destRect.x + destRect.w / 2, cy = destRect.y + destRect.h / 2;
         const rr = Math.min(destRect.w, destRect.h) * 0.13;
         ctx.strokeStyle = "rgba(255,255,255,.5)";
@@ -121,6 +129,17 @@ export const collageMode = (function () {
       });
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(eff.bitmap, box.x, box.y, box.w, box.h, destRect.x, destRect.y, destRect.w, destRect.h);
+      if (editing) {
+        const b = removeBadge(destRect);
+        ctx.beginPath(); ctx.arc(b.cx, b.cy, b.rr, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fill();
+        const k = b.rr * 0.45;
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = Math.max(2, b.rr * 0.18); ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(b.cx - k, b.cy - k); ctx.lineTo(b.cx + k, b.cy + k);
+        ctx.moveTo(b.cx + k, b.cy - k); ctx.lineTo(b.cx - k, b.cy + k);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
@@ -147,7 +166,7 @@ export const collageMode = (function () {
     // gutter color fills the whole output rect (gutters + outer margin show through)
     ctx.fillStyle = co.gutterColor;
     ctx.fillRect(pl.vp.x, pl.vp.y, pl.vp.w, pl.vp.h);
-    rects.forEach((r) => drawCellInto(ctx, co.cells[r.i], r));
+    rects.forEach((r) => drawCellInto(ctx, co.cells[r.i], r, true));
     // selection + swap-target overlays
     rects.forEach((r) => {
       if (r.i === hoverTarget) {
@@ -184,6 +203,19 @@ export const collageMode = (function () {
     if (idx < 0) return;
     state.collage.selected = idx;
     const cellTapped = state.collage.cells[idx];
+    // Filled cell: tap on the "×" badge clears the photo from the cell.
+    if (cellTapped && cellTapped.srcId) {
+      const b = removeBadge(rects[idx]);
+      if (Math.hypot((e.clientX - sr.left) - b.cx, (e.clientY - sr.top) - b.cy) <= b.rr * 1.3) {
+        cellTapped.srcId = null; cellTapped.zoom = 1; cellTapped.cx = 0.5; cellTapped.cy = 0.5;
+        try { stage.releasePointerCapture(e.pointerId); } catch (_) {}
+        pointers.delete(e.pointerId);
+        renderer.draw();
+        undo.commit();
+        if (onSelect) onSelect(idx);
+        return;
+      }
+    }
     if (!cellTapped || !cellTapped.srcId) {
       // Empty cell → import an image straight into it (no stray top-level slide).
       try { stage.releasePointerCapture(e.pointerId); } catch (_) {}

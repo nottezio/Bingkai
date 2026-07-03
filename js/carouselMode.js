@@ -134,42 +134,35 @@ export const carouselMode = (function () {
     const src = renderer.activeSource();
     const eff = src ? renderer.effective(src) : null;
     const c = state.carousel;
+    const browsing = c.adjust === "browse";
 
     if (pointers.size >= 2) {
-      // pinch zoom about the image centre (cover only)
-      const d = pdist();
-      if (pinchPrev > 0 && d > 0 && c.fill === "cover" && eff) {
-        const z = geometryCore.cropZoomAboutPoint({
-          sourceW: eff.w, sourceH: eff.h, ratioW: Wc, ratioH: Hc,
-          zoom: c.zoom, centerX: c.cx * eff.w, centerY: c.cy * eff.h, factor: d / pinchPrev, fx: 0.5, fy: 0.5,
-        });
-        c.zoom = z.zoom; c.cx = z.centerX / eff.w; c.cy = z.centerY / eff.h;
-        syncPosition(eff, Wc, Hc);
+      // Pinch-zoom repositions/scales the image → MOVE mode only. Browse is scroll-only.
+      if (!browsing && c.fill === "cover" && eff) {
+        const d = pdist();
+        if (pinchPrev > 0 && d > 0) {
+          const z = geometryCore.cropZoomAboutPoint({
+            sourceW: eff.w, sourceH: eff.h, ratioW: Wc, ratioH: Hc,
+            zoom: c.zoom, centerX: c.cx * eff.w, centerY: c.cy * eff.h, factor: d / pinchPrev, fx: 0.5, fy: 0.5,
+          });
+          c.zoom = z.zoom; c.cx = z.centerX / eff.w; c.cy = z.centerY / eff.h;
+          syncPosition(eff, Wc, Hc);
+        }
+        pinchPrev = d;
       }
-      pinchPrev = d;
       renderer.draw();
       return;
     }
     if (!drag) return;
-    if (c.adjust !== "browse" && c.fill === "cover" && eff) {
-      // free reposition: the image follows the finger in both axes
+    if (browsing) {
+      // Browse: horizontal drag scrolls the tile strip. Never repositions the image.
+      c.pos = geometryCore.clamp(c.pos - dx / m.pitch, 0, N - 1);
+    } else if (c.fill === "cover" && eff) {
+      // Move: the image follows the finger in both axes (reposition).
       const box = mapping(eff, Wc, Hc).box;
       c.cx -= (dx * ((box.w / N) / m.dispW)) / eff.w;
       c.cy -= (dy * (box.h / m.dispH)) / eff.h;
       syncPosition(eff, Wc, Hc);
-    } else {
-      // browse mode: lock axis — horizontal scrolls tiles, vertical repositions
-      if (!drag.axis) {
-        if (Math.abs(dx) > Math.abs(dy) + 2) drag.axis = "browse";
-        else if (Math.abs(dy) > Math.abs(dx) + 2) drag.axis = "position";
-      }
-      if (drag.axis === "position" && c.fill === "cover" && eff) {
-        const box = mapping(eff, Wc, Hc).box;
-        c.cy -= (dy * (box.h / m.dispH)) / eff.h;
-        syncPosition(eff, Wc, Hc);
-      } else {
-        c.pos = geometryCore.clamp(c.pos - dx / m.pitch, 0, N - 1);
-      }
     }
     renderer.draw();
   }
@@ -193,6 +186,7 @@ export const carouselMode = (function () {
   async function carouselFiles() {
     const src = renderer.activeSource();
     if (!src) return [];
+    await renderer.ensureCrop(src); // WYSIWYG: tiles must reflect the current crop
     const eff = renderer.effective(src);
     const { N, Hc, Wc, b } = composite();
     const map = mapping(eff, Wc, Hc);
@@ -235,6 +229,7 @@ export const carouselMode = (function () {
   async function tilesFor(src, c) {
     if (!src) return [];
     c = c || state.carousel;
+    await renderer.ensureCrop(src); // WYSIWYG: tiles must reflect the current crop
     const eff = renderer.effective(src);
     const { N, Hc, Wc, b } = composite(c);
     const map = mapping(eff, Wc, Hc, c);

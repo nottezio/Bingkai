@@ -64,7 +64,7 @@ export const importer = (function () {
           const w = bitmap.width, h = bitmap.height; // already orientation-corrected
           const thumbUrl = await makeThumbUrl(bitmap, w, h);
           const id = nextId();
-          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl, blob: f, crop: null, croppedBitmap: null, cropDims: null, frame: cloneFrame(state.frame), kind: "frame", carousel: cloneCarousel(state.carousel), collage: cloneCollage(state.collage) });
+          state.sources.push({ id, name: f.name || (id + ".jpg"), bitmap, w, h, thumbUrl, blob: f, crop: null, croppedBitmap: null, cropDims: null, frame: cloneFrame(state.frame), kind: "frame", carousel: cloneCarousel(state.carousel), collage: cloneCollage(state.collage, true) });
           sessionStore.putSource({ id, name: f.name || (id + ".jpg"), blob: f });
           if (!state.activeId) state.activeId = id;
           ok++;
@@ -94,7 +94,7 @@ export const importer = (function () {
     const thumbUrl = await makeThumbUrl(bitmap, w, h);
     state.sources.push({
       id: rec.id, name: rec.name || (rec.id + ".jpg"), bitmap, w, h, thumbUrl,
-      blob: rec.blob, crop: crop || null, croppedBitmap: null, cropDims: null, frame: cloneFrame(state.frame), kind: "frame", carousel: cloneCarousel(state.carousel), collage: cloneCollage(state.collage),
+      blob: rec.blob, crop: crop || null, croppedBitmap: null, cropDims: null, frame: cloneFrame(state.frame), kind: "frame", carousel: cloneCarousel(state.carousel), collage: cloneCollage(state.collage, true),
     });
     const n = parseInt(String(rec.id).replace(/^src_/, ""), 10);
     bumpIdSeq(n);

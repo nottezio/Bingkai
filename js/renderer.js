@@ -29,6 +29,17 @@ export const renderer = (function () {
     return !crop || (crop.ratio === "original" && Math.abs((crop.zoom || 1) - 1) < 1e-3);
   }
 
+  // Stable signature of the crop PARAMETERS. The whole class of "preview shows
+  // the new crop but export shows the old one" bugs comes from croppedBitmap
+  // being a cache that must be manually re-baked. We stamp this signature on the
+  // baked bitmap so any consumer can cheaply detect staleness and self-heal via
+  // ensureCrop() instead of relying on every mutation site to call bake.
+  function cropSig(crop) {
+    if (isIdentityCrop(crop)) return "";
+    const c = crop;
+    return [c.ratio, +c.zoom || 1, +c.cx || 0.5, +c.cy || 0.5, !!c.flip, c.rotate || 0].join("|");
+  }
+
   // Bake the active/given source's crop into a cached cropped bitmap (GPU-side,
   // via createImageBitmap with a sub-rect). Closes the previous one.
   async function bakeCrop(src) {
@@ -36,6 +47,7 @@ export const renderer = (function () {
     if (isIdentityCrop(src.crop)) {
       if (src.croppedBitmap) { try { src.croppedBitmap.close(); } catch (_) {} }
       src.croppedBitmap = null; src.cropDims = null;
+      src._cropSig = "";
       return;
     }
     const r = geometryCore.parseRatio(src.crop.ratio, src.w, src.h);
@@ -51,15 +63,26 @@ export const renderer = (function () {
     const prev = src.croppedBitmap;
     src.croppedBitmap = await createImageBitmap(src.bitmap, sx, sy, Math.max(1, sw), Math.max(1, sh));
     src.cropDims = { w: src.croppedBitmap.width, h: src.croppedBitmap.height };
+    src._cropSig = cropSig(src.crop);
     if (prev) { try { prev.close(); } catch (_) {} }
   }
   async function bakeCropActive() { await bakeCrop(activeSource()); }
+
+  // Self-healing freshness guard: re-bake only when the cached bitmap no longer
+  // matches the current crop params. Cheap no-op when already fresh, so it's
+  // safe to call before every consumer (preview draw, every export path).
+  async function ensureCrop(src) {
+    if (!src) return;
+    if (src._cropSig !== cropSig(src.crop)) await bakeCrop(src);
+  }
+  async function ensureCropAll() { for (const s of state.sources) await ensureCrop(s); }
 
   // Mark the active source and redraw. Previews now render from the full-res
   // bitmap directly (sharper), so no downscaled working bitmap is needed.
   async function useActive() {
     const src = activeSource();
     if (!src) { clear(); return; }
+    await ensureCrop(src); // consumers (frame/collage/carousel) read croppedBitmap — keep it fresh
     if (src.frame) state.frame = src.frame; // Phase C: frame settings are per-slide
     if (src.carousel) state.carousel = src.carousel; // Phase C2: carousel settings per-slide
     if (src.collage) state.collage = src.collage; // Phase C4: collage settings per-slide
@@ -133,5 +156,5 @@ export const renderer = (function () {
     ctx.drawImage(src.bitmap, fit.x, fit.y, fit.w, fit.h);
   }
 
-  return { useActive, draw, clear, activeSource, sizeStage, effective, bakeCrop, bakeCropActive };
+  return { useActive, draw, clear, activeSource, sizeStage, effective, bakeCrop, bakeCropActive, ensureCrop, ensureCropAll };
 })();

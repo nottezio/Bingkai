@@ -98,12 +98,22 @@ export const exporter = (function () {
     return _zipPromise;
   }
 
-  // Multi-file delivery for carousel: share files[] → ZIP (JSZip) → per-file.
-  async function deliverMany(files, meta) {
+  // Multi-file delivery. Sharing uses the OS share sheet (handles many files);
+  // for device saves the caller's pack choice decides ZIP vs separate files.
+  async function deliverMany(files, meta, opts) {
+    const pack = (opts && opts.pack) || "auto";
     if (!_forceDownload && navigator.canShare && navigator.canShare({ files })) {
       try { await navigator.share({ files }); ui.toast(STRINGS.sharedN); await record(files, meta); return true; }
       catch (e) { if (e && e.name === "AbortError") return false; }
     }
+    // Explicit "separate" → download each file individually.
+    if (pack === "separate") {
+      for (const f of files) { triggerDownload(f, f.name); await new Promise((r) => setTimeout(r, 300)); }
+      ui.toast(files.length + " " + STRINGS.downloadedN);
+      await record(files, meta);
+      return true;
+    }
+    // "zip" or "auto" → single ZIP (per-file only if JSZip can't load).
     await ensureJSZip();
     if (typeof JSZip !== "undefined") {
       const zip = new JSZip();
@@ -124,6 +134,7 @@ export const exporter = (function () {
   async function run() {
     const src = state.sources.find((s) => s.id === state.activeId);
     if (!src) return;
+    await renderer.ensureCropAll(); // WYSIWYG: never composite from a stale crop cache
     const opt = state.exportOpt;
     const isCrop = state.mode === "crop";
     const isCollage = state.mode === "collage";
@@ -176,6 +187,7 @@ export const exporter = (function () {
 
   // Build one framed File per photo (used by runBatch; exposed for testing).
   async function batchFiles() {
+    await renderer.ensureCropAll(); // WYSIWYG: fresh crops for every framed photo
     const opt = state.exportOpt;
     const type = opt.format === "png" ? "image/png" : "image/jpeg";
     const quality = opt.format === "png" ? undefined : opt.quality;
@@ -255,6 +267,7 @@ export const exporter = (function () {
     return blob;
   }
   async function postFiles() {
+    await renderer.ensureCropAll(); // WYSIWYG: fresh crops across the whole post
     const opt = state.exportOpt;
     const ext = opt.format === "png" ? "png" : "jpg";
     const slides = postModel.deriveFrameSlides(state.sources);
@@ -278,18 +291,18 @@ export const exporter = (function () {
     }
     return files;
   }
-  async function runPost() {
+  async function runPost(pack) {
     if (!state.sources.length) return false;
     ui.setBusy(true);
     try {
       const files = await postFiles();
       if (!files.length) return false;
-      return await deliverMany(files, { mode: "post", label: files.length + " image post" });
+      return await deliverMany(files, { mode: "post", label: files.length + " image post" }, { pack });
     } catch (e) {
       console.error("post export", e); ui.toast(STRINGS.exportFail); return false;
     } finally { ui.setBusy(false); }
   }
-  async function savePost() { return withDownload(runPost); }
+  async function savePost(pack) { return withDownload(() => runPost(pack)); }
 
   return { run, runBatch, batchFiles, save, saveBatch, withDownload, deliverMany, triggerDownload, exportPrefix, nameFor, postFiles, runPost, savePost };
 })();

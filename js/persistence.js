@@ -19,6 +19,11 @@ export const persistence = (function () {
   function applySnapshot(s) {
     if (!s) return;
     Object.assign(state.frame, s.frame || {});
+    // Migration: sessions saved before the enable toggle have no `enabled` field.
+    // Preserve intent — if they'd configured a real frame, keep it on.
+    if (s.frame && s.frame.enabled === undefined) {
+      state.frame.enabled = (s.frame.ratio && s.frame.ratio !== "original") || (+s.frame.marginPct || 0) > 0;
+    }
     Object.assign(state.exportOpt, s.exportOpt || {});
     Object.assign(state.collage, s.collage || {});
     Object.assign(state.carousel, s.carousel || {});
@@ -57,6 +62,9 @@ export const persistence = (function () {
     const p = listPresets().find((x) => x.name === name);
     if (!p) return false;
     Object.assign(state.frame, p.frame || {});
+    if (p.frame && p.frame.enabled === undefined) {
+      state.frame.enabled = (p.frame.ratio && p.frame.ratio !== "original") || (+p.frame.marginPct || 0) > 0;
+    }
     Object.assign(state.exportOpt, p.exportOpt || {});
     return true;
   }

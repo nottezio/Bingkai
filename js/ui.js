@@ -50,6 +50,9 @@ export const ui = (function () {
     document.getElementById("bgSolid").textContent = STRINGS.bgSolid;
     document.getElementById("bgBlur").textContent = STRINGS.bgBlur;
     document.getElementById("labFrameColor").textContent = STRINGS.frameColor;
+    { const le = document.getElementById("labFrameEnable"); if (le) le.textContent = STRINGS.frameEnable;
+      const on = document.getElementById("frameEnableOn"); if (on) on.textContent = STRINGS.frameOn;
+      const off = document.getElementById("frameEnableOff"); if (off) off.textContent = STRINGS.frameOff; }
     document.getElementById("labExportSize").textContent = STRINGS.exportSize;
     document.getElementById("sizeIG").textContent = STRINGS.sizeIG;
     document.getElementById("sizeHi").textContent = STRINGS.sizeHi;
@@ -121,9 +124,10 @@ export const ui = (function () {
     // Upscale warning: IG target width 1080 but source narrower than the frame inner area.
     const src = renderer.activeSource && renderer.activeSource();
     if (src && opt.ig) {
-      const r = geometryCore.parseRatio(f.ratio, src.w, src.h);
+      const off = f.enabled === false;
+      const r = geometryCore.parseRatio(off ? "original" : f.ratio, src.w, src.h);
       const dims = compositor.exportDims(r.w, r.h, true);
-      const innerW = dims.Cw * (1 - 2 * (f.marginPct / 100));
+      const innerW = dims.Cw * (1 - 2 * ((off ? 0 : f.marginPct) / 100));
       if (src.w < innerW - 1) { txt = STRINGS.upscaleWarn + " " + txt; note.className = "note warn"; }
     }
     note.textContent = txt;
@@ -135,12 +139,21 @@ export const ui = (function () {
   }
 
   function syncFrameRows() {
+    const f = state.frame;
+    const on = !!f.enabled;
+    // Reflect the master toggle.
+    document.querySelectorAll("#frameEnableSeg button").forEach((b) =>
+      b.setAttribute("aria-pressed", String((b.dataset.en === "1") === on)));
+    // When framing is OFF the styling controls are irrelevant — hide them all.
+    ["frameRatioRow", "frameOrientRow", "marginRow", "bgRow", "frameColorRow", "blurRow"].forEach((id) => {
+      const el = document.getElementById(id); if (el) el.style.display = on ? "" : "none";
+    });
+    if (!on) return;
     // Frame-color row only for solid bg; blur row only for blur bg; quality only for JPEG.
     document.getElementById("frameColorRow").style.display = state.frame.bg === "solid" ? "" : "none";
     document.getElementById("blurRow").style.display = state.frame.bg === "blur" ? "" : "none";
     document.getElementById("qualityRow").style.display = state.exportOpt.format === "jpeg" ? "" : "none";
     // Orientation toggle only for non-square, non-original ratios.
-    const f = state.frame;
     const canFlip = f.ratio !== "original" && f.ratio !== "1:1";
     document.getElementById("frameOrientRow").style.display = canFlip ? "" : "none";
     if (canFlip) {
@@ -195,10 +208,21 @@ export const ui = (function () {
   }
 
   function bindFrameControls() {
+    // Master On/Off. Off = raw image export; hides the styling rows.
+    document.querySelectorAll("#frameEnableSeg button").forEach((b) =>
+      b.addEventListener("click", () => {
+        undo.begin();
+        state.frame.enabled = b.dataset.en === "1";
+        syncFrameRows();
+        renderer.draw(); updateExportNote();
+        persistence.scheduleSave();
+        undo.commit();
+      }));
     // Ratio chips
     document.querySelectorAll("#ratioChips .chip").forEach((c) =>
       c.addEventListener("click", () => {
         undo.begin();
+        state.frame.enabled = true; // picking a framed ratio turns framing on
         state.frame.ratio = c.dataset.ratio;
         state.frame.flip = false; // new ratio starts in its natural orientation
         pressGroup("#ratioChips .chip", "ratio", c.dataset.ratio);
@@ -219,6 +243,7 @@ export const ui = (function () {
     // Margin
     const mr = document.getElementById("marginRange");
     mr.addEventListener("input", () => {
+      state.frame.enabled = true;
       state.frame.marginPct = +mr.value;
       document.getElementById("marginVal").textContent = mr.value + "%";
       renderer.draw(); updateExportNote();
@@ -226,6 +251,7 @@ export const ui = (function () {
     // Background mode
     document.querySelectorAll("#bgSeg button").forEach((b) =>
       b.addEventListener("click", () => {
+        state.frame.enabled = true;
         state.frame.bg = b.dataset.bg;
         pressGroup("#bgSeg button", "bg", b.dataset.bg);
         syncFrameRows(); renderer.draw();
@@ -233,6 +259,7 @@ export const ui = (function () {
     // Frame color swatches
     document.querySelectorAll("#frameSwatches .sw[data-color]").forEach((s) =>
       s.addEventListener("click", () => {
+        state.frame.enabled = true;
         state.frame.frameColor = s.dataset.color;
         document.querySelectorAll("#frameSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
         s.setAttribute("aria-pressed", "true");
@@ -240,6 +267,7 @@ export const ui = (function () {
       }));
     const cc = document.getElementById("customColor");
     cc.addEventListener("input", () => {
+      state.frame.enabled = true;
       state.frame.frameColor = cc.value;
       document.querySelectorAll("#frameSwatches .sw").forEach((x) => x.setAttribute("aria-pressed", "false"));
       document.getElementById("customSw").setAttribute("aria-pressed", "true");
@@ -272,6 +300,7 @@ export const ui = (function () {
     // Blur strength
     const br = document.getElementById("blurRange");
     br.addEventListener("input", () => {
+      state.frame.enabled = true;
       state.frame.blurStrength = +br.value / 100;
       document.getElementById("blurVal").textContent = br.value + "%";
       renderer.draw();
@@ -626,6 +655,8 @@ export const ui = (function () {
       collageMode.ensureCells();
       if (a && state.collage.cells.length && !state.collage.cells.some((c) => c.srcId)) state.collage.cells[0].srcId = a.id;
       syncCollageControls(); renderer.draw(); layoutPicker.refreshCellFill();
+      // Cells can reference OTHER slides — keep every referenced crop fresh, then repaint.
+      renderer.ensureCropAll().then(() => { if (state.mode === "collage") renderer.draw(); });
     }
     else if (mode === "carousel") {
       state.carousel.pos = 0;
@@ -676,6 +707,20 @@ export const ui = (function () {
     bindCropControls();
     bindCollageControls();
     bindCarouselControls();
+
+    // Centralized undo capture: any control interaction inside a tool sheet is
+    // recorded by default, so new controls are covered without per-handler wiring
+    // (the root cause of "undo doesn't work" for margin/bg/color/gutter/etc.).
+    // Handlers that already call begin/commit still work — begin() is idempotent
+    // and their synchronous commit wins; the debounced commit then no-ops.
+    ["sheetFrame", "sheetCrop", "sheetCollage", "sheetCarousel"].forEach((id) => {
+      const el = document.getElementById(id); if (!el) return;
+      el.addEventListener("pointerdown", () => undo.begin(), true); // snapshot pre-edit state
+      el.addEventListener("focusin", () => undo.begin());
+      el.addEventListener("input", () => undo.schedule());          // coalesce slider drags
+      el.addEventListener("change", () => undo.schedule());
+      el.addEventListener("click", () => undo.schedule());
+    });
 
     // Collapsible panel: hide the controls to enlarge the photo preview.
     document.getElementById("sheetHandle").addEventListener("click", () => {
