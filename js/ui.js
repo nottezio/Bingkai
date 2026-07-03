@@ -149,10 +149,9 @@ export const ui = (function () {
       const el = document.getElementById(id); if (el) el.style.display = on ? "" : "none";
     });
     if (!on) return;
-    // Frame-color row only for solid bg; blur row only for blur bg; quality only for JPEG.
+    // Frame-color row only for solid bg; blur row only for blur bg.
     document.getElementById("frameColorRow").style.display = state.frame.bg === "solid" ? "" : "none";
     document.getElementById("blurRow").style.display = state.frame.bg === "blur" ? "" : "none";
-    document.getElementById("qualityRow").style.display = state.exportOpt.format === "jpeg" ? "" : "none";
     // Orientation toggle only for non-square, non-original ratios.
     const canFlip = f.ratio !== "original" && f.ratio !== "1:1";
     document.getElementById("frameOrientRow").style.display = canFlip ? "" : "none";

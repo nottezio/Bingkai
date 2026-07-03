@@ -135,27 +135,6 @@
       </div>
     </div>
 
-    <div class="row">
-      <div class="lab"><span id="labExportSize">Ukuran ekspor</span></div>
-      <div class="seg" id="sizeSeg">
-        <button data-ig="1" aria-pressed="true" id="sizeIG">Instagram 1080</button>
-        <button data-ig="0" id="sizeHi">Resolusi tinggi</button>
-      </div>
-    </div>
-
-    <div class="row" id="qualityRow">
-      <div class="lab"><span id="labQuality">Kualitas JPEG</span><span id="qualityVal">92</span></div>
-      <input type="range" id="qualityRange" min="70" max="95" step="1" value="92" />
-    </div>
-
-    <div class="row">
-      <div class="lab"><span id="labFormat">Format</span></div>
-      <div class="seg" id="formatSeg">
-        <button data-fmt="jpeg" aria-pressed="true" id="fmtJpeg">JPEG (foto)</button>
-        <button data-fmt="png" id="fmtPng">PNG (desain)</button>
-      </div>
-    </div>
-
     <div class="export-row" id="frameExportRow">
       <button class="btn-primary" id="btnExport">Ekspor</button>
       <button class="chip ghost" id="btnSave" style="padding:13px 16px">Simpan</button>
@@ -438,20 +417,21 @@
       </div>
     </div>
     <div class="exp-section">
-      <div class="exp-label" id="expQualLabel">Quality</div>
-      <div class="exp-opts" id="expQual">
-        <button class="exp-opt" data-q="ig" aria-pressed="true">
-          <div class="exp-opt-t" id="expQIgT">Instagram optimal</div>
-          <div class="exp-opt-s" id="expQIgS">1080px wide · JPEG 90%</div>
-        </button>
-        <button class="exp-opt" data-q="high" aria-pressed="false">
-          <div class="exp-opt-t" id="expQHiT">High</div>
-          <div class="exp-opt-s" id="expQHiS">1080px wide · JPEG 95%</div>
-        </button>
-        <button class="exp-opt" data-q="max" aria-pressed="false">
-          <div class="exp-opt-t" id="expQMxT">Maximum</div>
-          <div class="exp-opt-s" id="expQMxS">Full resolution · JPEG 100%</div>
-        </button>
+      <div class="exp-label" id="labExportSize">Export size</div>
+      <div class="seg" id="sizeSeg">
+        <button data-ig="1" aria-pressed="true" id="sizeIG">Instagram 1080</button>
+        <button data-ig="0" id="sizeHi">High resolution</button>
+      </div>
+    </div>
+    <div class="exp-section" id="qualityRow">
+      <div class="exp-label"><span id="labQuality">JPEG quality</span> <span id="qualityVal">92</span></div>
+      <input type="range" id="qualityRange" min="70" max="95" step="1" value="92" />
+    </div>
+    <div class="exp-section">
+      <div class="exp-label" id="labFormat">Format</div>
+      <div class="seg" id="formatSeg">
+        <button data-fmt="jpeg" aria-pressed="true" id="fmtJpeg">JPEG (photo)</button>
+        <button data-fmt="png" id="fmtPng">PNG (design)</button>
       </div>
     </div>
     <div class="exp-section" id="expPackSection">

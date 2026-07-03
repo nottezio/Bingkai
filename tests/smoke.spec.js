@@ -77,12 +77,13 @@ const results=[]; const rec=(name,ok,detail)=>{results.push({name,ok});console.l
     await page.click('#btnExportPost');
     await page.waitForSelector('#exportModal.show',{timeout:5000});
     await page.click('#expDest .exp-opt[data-dest="device"]');
-    await page.click('#expQual .exp-opt[data-q="max"]');
+    await page.click('#sizeSeg button[data-ig="0"]');      // high resolution -> ig=false
+    await page.click('#formatSeg button[data-fmt="png"]'); // PNG must be preserved (not forced to jpeg)
     await page.click('#exportGo');
     await page.waitForFunction(()=>!document.getElementById('exportModal').classList.contains('show'),null,{timeout:5000});
     const ex=await page.evaluate(()=>({opt:{...window.__app.state.exportOpt},spy:{...window.__spy}}));
-    rec('export routing: max quality -> ig=false, quality=1.0',ex.opt.ig===false&&ex.opt.quality===1.0,`ig=${ex.opt.ig} q=${ex.opt.quality}`);
-    rec('export routing: format jpeg',ex.opt.format==='jpeg');
+    rec('export routing: high-res size -> ig=false',ex.opt.ig===false,`ig=${ex.opt.ig}`);
+    rec('export routing: PNG format preserved (not forced jpeg)',ex.opt.format==='png',`format=${ex.opt.format}`);
     rec('export routing: device dest -> savePost (not runPost)',ex.spy.save===1&&ex.spy.run===0,`save=${ex.spy.save} run=${ex.spy.run}`);
 
     // ---- [6] slider ball-only (overlay gesture in hardenRanges) ----
