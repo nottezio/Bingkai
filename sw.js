@@ -1,17 +1,21 @@
 /* Bingkai — service worker.
- * Precaches the app shell so the PWA works offline after one online load.
+ * The app shell is precached so the PWA still works offline after one online load.
  *
- * IMPORTANT: navigation is NETWORK-FIRST. When online, the latest index.html is
- * always served (so a new deploy shows up immediately); the cache is only used
- * as an offline fallback. Bump CACHE on every deploy to purge the old shell.
+ * STRATEGY: NETWORK-FIRST for every same-origin request (navigation AND the
+ * js/css modules). When online, the newest files are always served, so a new
+ * deploy shows up immediately — you never have to remember to bump CACHE to
+ * avoid shipping stale JavaScript. The cache is a pure offline fallback.
  *
- * The JSZip CDN URL is precached best-effort (opaque, cross-origin); if the
- * network blocks it, install still succeeds and the app falls back to per-file
- * downloads for carousel export.
+ * The old build served js/css CACHE-FIRST, which meant a cached module was
+ * returned forever until CACHE changed by hand; forgetting to bump it shipped a
+ * new index.html on top of old modules (new buttons, old logic). This version
+ * removes that footgun.
+ *
+ * The JSZip CDN URL is versioned/immutable, so it stays cache-first.
  */
 'use strict';
 
-const CACHE = 'bingkai-v4';
+const CACHE = 'bingkai-v5';
 const SHELL = [
   './', './index.html', './css/app.css',
   './js/main.js', './js/carouselMode.js', './js/collageMode.js',
@@ -28,7 +32,8 @@ const JSZIP = 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    await cache.addAll(SHELL);
+    // cache:'reload' bypasses the browser HTTP cache so the precache is truly fresh.
+    await cache.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' })));
     try { await cache.add(new Request(JSZIP, { mode: 'no-cors' })); } catch (_) {}
     self.skipWaiting();
   })());
@@ -50,28 +55,40 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
-  // Navigation: NETWORK-FIRST so a new deploy is seen immediately when online.
-  if (req.mode === 'navigate') {
+  const sameOrigin = new URL(req.url).origin === location.origin;
+
+  // Same-origin (navigation + js/css/icons): NETWORK-FIRST.
+  // Always try the network so a new deploy is picked up right away; the cache is
+  // only used when offline. This is what makes deploys reliably "take".
+  if (sameOrigin) {
     event.respondWith((async () => {
       try {
         const res = await fetch(req, { cache: 'no-store' });
-        const cache = await caches.open(CACHE);
-        cache.put('./index.html', res.clone());
+        if (res && res.ok) {
+          const cache = await caches.open(CACHE);
+          cache.put(req, res.clone());
+          if (req.mode === 'navigate') cache.put('./index.html', res.clone());
+        }
         return res;
       } catch (_) {
-        return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+        const cached = await caches.match(req);
+        if (cached) return cached;
+        if (req.mode === 'navigate') {
+          return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
+        }
+        return Response.error();
       }
     })());
     return;
   }
 
-  // Other GETs: cache-first, then network, caching same-origin successes.
+  // Cross-origin immutable assets (versioned JSZip CDN): cache-first is safe.
   event.respondWith((async () => {
     const cached = await caches.match(req);
     if (cached) return cached;
     try {
       const res = await fetch(req);
-      if (res && (res.ok || res.type === 'opaque') && new URL(req.url).origin === location.origin) {
+      if (res && (res.ok || res.type === 'opaque')) {
         const cache = await caches.open(CACHE);
         cache.put(req, res.clone());
       }
