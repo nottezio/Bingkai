@@ -2,6 +2,7 @@ import { carouselMode } from './carouselMode.js';
 import { collageMode } from './collageMode.js';
 import { compositor } from './compositor.js';
 import { CONFIG } from './config.js';
+import { cropDebug } from './cropDebug.js';
 import { cropMode } from './cropMode.js';
 import { geometryCore } from './geometryCore.js';
 import { state } from './state.js';
@@ -64,20 +65,35 @@ export const renderer = (function () {
     let rw = r.w, rh = r.h;
     if (src.crop.flip && src.crop.ratio !== "original" && r.w !== r.h) { rw = r.h; rh = r.w; }
     const sig = cropSig(src.crop); // snapshot params NOW, before any await
+    // ATOMIC CAPTURE — read the bitmap AND the dimensions it corresponds to in the
+    // same synchronous tick, before any await. applyRotation() is a *separate*
+    // async mutator that reassigns src.bitmap and swaps src.w/src.h; if it runs
+    // between here and createImageBitmap, cropping the new bitmap with old-dim
+    // coordinates yields a DIFFERENT AREA than the crop box showed. Capturing the
+    // pair together (and cropping the captured ref, not src.bitmap live) makes the
+    // bake self-consistent; the generation check then discards it if superseded.
+    const srcBitmap = src.bitmap, srcW = src.w, srcH = src.h;
     const box = geometryCore.computeCropBoxLocked({
-      sourceW: src.w, sourceH: src.h, ratioW: rw, ratioH: rh,
-      zoom: src.crop.zoom, centerX: src.crop.cx * src.w, centerY: src.crop.cy * src.h,
+      sourceW: srcW, sourceH: srcH, ratioW: rw, ratioH: rh,
+      zoom: src.crop.zoom, centerX: src.crop.cx * srcW, centerY: src.crop.cy * srcH,
     });
     const sx = Math.max(0, Math.round(box.x)), sy = Math.max(0, Math.round(box.y));
-    const sw = Math.min(src.w - sx, Math.round(box.w)), sh = Math.min(src.h - sy, Math.round(box.h));
-    const baked = await createImageBitmap(src.bitmap, sx, sy, Math.max(1, sw), Math.max(1, sh));
-    // A newer bake started while we awaited — discard ours, it's stale.
+    const sw = Math.min(srcW - sx, Math.round(box.w)), sh = Math.min(srcH - sy, Math.round(box.h));
+    let baked;
+    try {
+      baked = await createImageBitmap(srcBitmap, sx, sy, Math.max(1, sw), Math.max(1, sh));
+    } catch (_) {
+      // srcBitmap may have been closed by a concurrent rotation — abort this bake.
+      return;
+    }
+    // A newer bake (or a rotation bumping the gen) started while we awaited — discard.
     if (gen !== src._bakeGen) { try { baked.close(); } catch (_) {} return; }
     const prev = src.croppedBitmap;
     src.croppedBitmap = baked;
     src.cropDims = { w: baked.width, h: baked.height };
     src._cropSig = sig; // sig captured pre-await, guaranteed to match THESE pixels
     if (prev) { try { prev.close(); } catch (_) {} }
+    cropDebug.bakeCommit(src, box, srcW, srcH);
   }
   async function bakeCropActive() { await bakeCrop(activeSource()); }
 

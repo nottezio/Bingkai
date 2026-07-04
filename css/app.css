@@ -205,10 +205,17 @@
   .po-strip { flex: 1 1 auto; display: flex; align-items: center; justify-content: safe center; gap: 10px; overflow-x: auto; padding-bottom: 2px; }
   .po-strip::-webkit-scrollbar { display: none; }
   .po-card {
-    position: relative; flex: 0 0 auto; height: min(88%, 620px); background: #fff;
+    position: relative; flex: 0 0 auto;
+    background: #fff;
     border: 2px solid; border-color: var(--bevel-hi) var(--bevel-sh) var(--bevel-sh) var(--bevel-hi);
     box-shadow: inset -1px -1px 0 var(--bevel-deep), inset 1px 1px 0 var(--bevel-inner);
-    cursor: pointer; overflow: hidden;
+    cursor: pointer; overflow: hidden; line-height: 0;
+  }
+  .po-card canvas, .po-card img {
+    display: block;
+    height: min(78vh - 180px, 560px);
+    max-width: 84vw;
+    width: auto; object-fit: contain;
   }
   .po-card.selected {
     border-color: var(--bevel-sh) var(--bevel-hi) var(--bevel-hi) var(--bevel-sh);
@@ -674,7 +681,7 @@
   /* post-overview "add" tile + heading emphasis */
   .po-head b { font-weight: bold; }
   .po-add {
-    flex: 0 0 auto; width: 92px; height: min(88%, 620px); background: var(--panel);
+    flex: 0 0 auto; width: 92px; height: min(78vh - 180px, 560px); background: var(--panel);
     display: flex; align-items: center; justify-content: center;
     color: #000; font-family: var(--font-head); font-size: 34px; font-weight: 900; cursor: pointer;
     border: 2px dashed; border-color: #808080;

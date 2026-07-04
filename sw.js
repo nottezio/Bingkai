@@ -18,12 +18,12 @@
  */
 'use strict';
 
-const CACHE = 'bingkai-v7';
+const CACHE = 'bingkai-v8';
 const SHELL = [
   './', './index.html', './css/app.css',
   './js/main.js', './js/carouselMode.js', './js/collageMode.js',
   './js/collageTemplates.js', './js/compositor.js', './js/config.js',
-  './js/cropMode.js', './js/exportModal.js', './js/exporter.js',
+  './js/cropMode.js', './js/cropDebug.js', './js/exportModal.js', './js/exporter.js',
   './js/geometryCore.js', './js/historyStore.js', './js/importer.js',
   './js/layoutPicker.js', './js/persistence.js', './js/postModel.js',
   './js/postPreview.js', './js/postView.js', './js/pwa.js',

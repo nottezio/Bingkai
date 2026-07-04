@@ -1,5 +1,6 @@
 import { collageMode } from './collageMode.js';
 import { CONFIG } from './config.js';
+import { cropDebug } from './cropDebug.js';
 import { geometryCore } from './geometryCore.js';
 import { layoutPicker } from './layoutPicker.js';
 import { renderer } from './renderer.js';
@@ -105,27 +106,37 @@ export const importer = (function () {
   // read src.bitmap/src.w/src.h, so they pick up the new orientation for free.
   async function applyRotation(src, deg) {
     if (!src) return;
-    const d = (((deg | 0) % 360) + 360) % 360;
-    if (!src.origBitmap) { src.origBitmap = src.bitmap; src.origW = src.w; src.origH = src.h; }
-    const closeCur = () => { if (src.bitmap && src.bitmap !== src.origBitmap) { try { src.bitmap.close(); } catch (_) {} } };
-    if (d === 0) {
-      closeCur();
-      src.bitmap = src.origBitmap; src.w = src.origW; src.h = src.origH;
-    } else {
-      const dims = geometryCore.rotatedDims(src.origW, src.origH, d);
-      const cv = document.createElement("canvas");
-      cv.width = dims.w; cv.height = dims.h;
-      const ctx = cv.getContext("2d");
-      ctx.imageSmoothingQuality = "high";
-      ctx.translate(dims.w / 2, dims.h / 2);
-      ctx.rotate((d * Math.PI) / 180);
-      ctx.drawImage(src.origBitmap, -src.origW / 2, -src.origH / 2, src.origW, src.origH);
-      const rb = await createImageBitmap(cv);
-      closeCur();
-      src.bitmap = rb; src.w = dims.w; src.h = dims.h;
+    // Invalidate any in-flight crop bake: rotation swaps src.w/src.h and
+    // reassigns src.bitmap, so a bake that started before this must not commit
+    // (its coordinates belong to the old orientation). Bumping the generation
+    // makes bakeCrop discard the stale result.
+    src._bakeGen = (src._bakeGen || 0) + 1;
+    cropDebug.rotationStart();
+    try {
+      const d = (((deg | 0) % 360) + 360) % 360;
+      if (!src.origBitmap) { src.origBitmap = src.bitmap; src.origW = src.w; src.origH = src.h; }
+      const closeCur = () => { if (src.bitmap && src.bitmap !== src.origBitmap) { try { src.bitmap.close(); } catch (_) {} } };
+      if (d === 0) {
+        closeCur();
+        src.bitmap = src.origBitmap; src.w = src.origW; src.h = src.origH;
+      } else {
+        const dims = geometryCore.rotatedDims(src.origW, src.origH, d);
+        const cv = document.createElement("canvas");
+        cv.width = dims.w; cv.height = dims.h;
+        const ctx = cv.getContext("2d");
+        ctx.imageSmoothingQuality = "high";
+        ctx.translate(dims.w / 2, dims.h / 2);
+        ctx.rotate((d * Math.PI) / 180);
+        ctx.drawImage(src.origBitmap, -src.origW / 2, -src.origH / 2, src.origW, src.origH);
+        const rb = await createImageBitmap(cv);
+        closeCur();
+        src.bitmap = rb; src.w = dims.w; src.h = dims.h;
+      }
+      try { if (src.thumbUrl) URL.revokeObjectURL(src.thumbUrl); } catch (_) {}
+      src.thumbUrl = await makeThumbUrl(src.bitmap, src.w, src.h);
+    } finally {
+      cropDebug.rotationEnd();
     }
-    try { if (src.thumbUrl) URL.revokeObjectURL(src.thumbUrl); } catch (_) {}
-    src.thumbUrl = await makeThumbUrl(src.bitmap, src.w, src.h);
   }
 
   return { importFiles, makeWorkingBitmap, disposeSource, restoreSource, applyRotation };
