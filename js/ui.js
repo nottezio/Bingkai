@@ -2,6 +2,7 @@ import { carouselMode } from './carouselMode.js';
 import { collageMode } from './collageMode.js';
 import { COLLAGE_TEMPLATES } from './collageTemplates.js';
 import { compositor } from './compositor.js';
+import { CONFIG } from './config.js';
 import { cropMode } from './cropMode.js';
 import { exporter } from './exporter.js';
 import { geometryCore } from './geometryCore.js';
@@ -508,7 +509,8 @@ export const ui = (function () {
     const msg = n === 0
       ? STRINGS.marqueeEmpty
       : STRINGS.marqueeStats.replace("{slides}", slides).replace("{sources}", n);
-    track.textContent = msg + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0" + msg + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0";
+    const stamped = msg + "\u00A0\u00A0\u00B7\u00A0\u00A0BUILD " + CONFIG.BUILD;
+    track.textContent = stamped + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0" + stamped + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0";
   }
 
   function updateBatchBtn() {

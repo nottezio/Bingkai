@@ -37,7 +37,13 @@ export const pwa = (function () {
       refreshing = true;
       location.reload();
     });
-    navigator.serviceWorker.register("./sw.js").then((reg) => {
+    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none" }).then((reg) => {
+      // updateViaCache:'none' is the key fix: it tells the browser to bypass its
+      // HTTP cache when checking sw.js, so a new deploy is detected immediately
+      // instead of up to ~10 min later (GitHub Pages' default max-age on sw.js).
+      // Without it, the browser kept re-reading a cached sw.js, never saw the
+      // byte change, never fired updatefound, and kept the old worker (and old
+      // cached JS) in control — which is why deploys "randomly" didn't appear.
       if (reg.waiting && navigator.serviceWorker.controller) reg.waiting.postMessage("SKIP_WAITING");
       reg.addEventListener("updatefound", () => {
         const nw = reg.installing;
@@ -48,6 +54,12 @@ export const pwa = (function () {
           }
         });
       });
+      // Actively check for a new SW on load and whenever the app regains focus.
+      // An installed PWA otherwise checks rarely (sometimes only on full restart),
+      // so this makes updates land on the next foreground without a manual reload.
+      const poll = () => { reg.update().catch(() => {}); };
+      poll();
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
     }).catch((e) => console.warn("SW register failed", e));
   }
 
