@@ -18,7 +18,7 @@
  */
 'use strict';
 
-const CACHE = 'bingkai-v6';
+const CACHE = 'bingkai-v7';
 const SHELL = [
   './', './index.html', './css/app.css',
   './js/main.js', './js/carouselMode.js', './js/collageMode.js',

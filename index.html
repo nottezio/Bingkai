@@ -26,7 +26,6 @@
     <button class="exp-btn" id="btnExportPost">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 8l5-5 5 5M5 21h14"/></svg>
       <span id="lblExportPost">Export</span>
-      <span class="badge-new badge-pulse">NEW!</span>
     </button>
     <button class="icon-btn" id="btnUndo" disabled aria-label="Urungkan">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 5 5v1a5 5 0 0 1-5 5H7"/></svg>
@@ -143,11 +142,6 @@
       </div>
     </div>
 
-    <div class="export-row" id="frameExportRow">
-      <button class="btn-primary" id="btnExport">Ekspor</button>
-      <button class="chip ghost" id="btnSave" style="padding:13px 16px">Simpan</button>
-      <button class="chip ghost" id="btnExportAll" style="display:none; padding:13px 16px">Semua</button>
-    </div>
     <div class="note status-bar" id="exportNote"></div>
 
     <div class="row" id="presetsRow" style="margin-top:14px">
@@ -181,8 +175,6 @@
     </div>
     <div class="export-row">
       <button class="chip ghost" id="btnCropReset" style="padding:13px 16px">Atur ulang</button>
-      <button class="btn-primary" id="btnCropExport">Ekspor</button>
-      <button class="chip ghost" id="btnCropSave" style="padding:13px 16px">Simpan</button>
     </div>
     <div class="note" id="cropExportNote"></div>
   </div>
@@ -227,10 +219,6 @@
       </div>
     </div>
     <div class="note" id="collageHint"></div>
-    <div class="export-row" id="collageExportRow">
-      <button class="btn-primary" id="btnCollageExport">Ekspor</button>
-      <button class="chip ghost" id="btnCollageSave" style="padding:13px 16px">Simpan</button>
-    </div>
   </div>
 
   <div class="sheet hidden" id="sheetCarousel">
@@ -265,11 +253,6 @@
       </div>
     </div>
     <div class="note" id="carouselHint"></div>
-    <div class="export-row">
-      <button class="btn-primary" id="btnCarouselExport">Ekspor</button>
-      <button class="chip ghost" id="btnCarouselPreview" style="padding:13px 16px">Pratinjau</button>
-      <button class="chip ghost" id="btnCarouselSave" style="padding:13px 16px">Simpan</button>
-    </div>
     <div class="note" id="carouselNote"></div>
   </div>
   </div><!-- /dock-body -->
@@ -312,6 +295,10 @@
     <button class="sa-btn primary" data-act="carousel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="7" y="4" width="10" height="16" rx="1.5"/><path d="M3.5 8v8M20.5 8v8"/></svg>
       <span>Carousel</span>
+    </button>
+    <button class="sa-btn" data-act="revert" id="saRevert" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M3.5 13a9 9 0 1 0 2.6-6.4L3 9"/></svg>
+      <span id="lblRevert">Reset</span>
     </button>
     <button class="sa-btn" data-act="dup">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>

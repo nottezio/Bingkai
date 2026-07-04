@@ -27,7 +27,7 @@ export const postView = (function () {
       const num = document.createElement("div");
       num.className = "po-num"; num.textContent = String(i + 1);
       card.appendChild(num);
-      if (sl.kind && sl.kind !== "frame") {
+      if (sl.kind === "collage" || sl.kind === "carousel") {
         const k = document.createElement("div");
         k.className = "po-kind";
         k.textContent = sl.kind === "carousel" ? ("Carousel \u00d7" + postModel.slideOutputCount(sl)) : "Collage";
@@ -82,6 +82,11 @@ export const postView = (function () {
     selectedId = state.activeId;
     sync();
   }
+  function doRevert() {
+    if (!selectedId) return;
+    ui.revertSlide(selectedId);
+    sync();
+  }
 
   function sync() {
     if (!state.view) state.view = "overview";
@@ -99,6 +104,12 @@ export const postView = (function () {
     document.getElementById("btnPost").style.display = editing ? "none" : "";
     document.getElementById("btnHistory").style.display = editing ? "none" : "";
     document.getElementById("slideActions").classList.toggle("show", ov && !!selectedId);
+    // #6: revert only makes sense for an applied collage/carousel.
+    const selKind = selectedId ? (state.sources.find((s) => s.id === selectedId) || {}).kind : null;
+    const rv = document.getElementById("saRevert");
+    if (rv) rv.style.display = (selKind === "collage" || selKind === "carousel") ? "" : "none";
+    // #5: overview shows all mode tabs again (edit view re-hides via setMode).
+    if (ov) document.querySelectorAll(".mode.mode-hidden").forEach((b) => b.classList.remove("mode-hidden"));
     if (ov) renderOverview();
   }
 
@@ -109,6 +120,7 @@ export const postView = (function () {
       if (act === "crop" || act === "frame" || act === "collage" || act === "carousel") enterEdit(act);
       else if (act === "delete") doDelete();
       else if (act === "dup") doDup();
+      else if (act === "revert") doRevert();
     });
     document.getElementById("btnDone").addEventListener("click", exitEdit);
     const ep = document.getElementById("btnExportPost");

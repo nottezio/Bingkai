@@ -44,7 +44,16 @@ export const renderer = (function () {
   // via createImageBitmap with a sub-rect). Closes the previous one.
   async function bakeCrop(src) {
     if (!src) return;
+    // Reentrancy guard: multiple callers (useActive, crop onUp, every export via
+    // ensureCropAll) can launch a bake for the SAME source concurrently. Without
+    // this, completion order — not call order — decides the winner, so an older
+    // crop's bitmap can overwrite a newer one AND stamp a sig matching the new
+    // params, leaving ensureCrop unable to self-heal. That was the intermittent
+    // "export shows the wrong crop" bug. We tag each bake with a generation and
+    // only let the latest one commit its result.
+    const gen = (src._bakeGen = (src._bakeGen || 0) + 1);
     if (isIdentityCrop(src.crop)) {
+      if (gen !== src._bakeGen) return;
       if (src.croppedBitmap) { try { src.croppedBitmap.close(); } catch (_) {} }
       src.croppedBitmap = null; src.cropDims = null;
       src._cropSig = "";
@@ -54,16 +63,20 @@ export const renderer = (function () {
     // honor the per-image orientation flip (landscape) for non-square ratios
     let rw = r.w, rh = r.h;
     if (src.crop.flip && src.crop.ratio !== "original" && r.w !== r.h) { rw = r.h; rh = r.w; }
+    const sig = cropSig(src.crop); // snapshot params NOW, before any await
     const box = geometryCore.computeCropBoxLocked({
       sourceW: src.w, sourceH: src.h, ratioW: rw, ratioH: rh,
       zoom: src.crop.zoom, centerX: src.crop.cx * src.w, centerY: src.crop.cy * src.h,
     });
     const sx = Math.max(0, Math.round(box.x)), sy = Math.max(0, Math.round(box.y));
     const sw = Math.min(src.w - sx, Math.round(box.w)), sh = Math.min(src.h - sy, Math.round(box.h));
+    const baked = await createImageBitmap(src.bitmap, sx, sy, Math.max(1, sw), Math.max(1, sh));
+    // A newer bake started while we awaited — discard ours, it's stale.
+    if (gen !== src._bakeGen) { try { baked.close(); } catch (_) {} return; }
     const prev = src.croppedBitmap;
-    src.croppedBitmap = await createImageBitmap(src.bitmap, sx, sy, Math.max(1, sw), Math.max(1, sh));
-    src.cropDims = { w: src.croppedBitmap.width, h: src.croppedBitmap.height };
-    src._cropSig = cropSig(src.crop);
+    src.croppedBitmap = baked;
+    src.cropDims = { w: baked.width, h: baked.height };
+    src._cropSig = sig; // sig captured pre-await, guaranteed to match THESE pixels
     if (prev) { try { prev.close(); } catch (_) {} }
   }
   async function bakeCropActive() { await bakeCrop(activeSource()); }
@@ -73,6 +86,10 @@ export const renderer = (function () {
   // safe to call before every consumer (preview draw, every export path).
   async function ensureCrop(src) {
     if (!src) return;
+    // Re-bake when the cached pixels don't match current params. The generation
+    // guard in bakeCrop makes this safe under concurrency: if a bake is already
+    // in flight, ours either supersedes it or is discarded — either way the
+    // committed bitmap+sig pair is always internally consistent afterward.
     if (src._cropSig !== cropSig(src.crop)) await bakeCrop(src);
   }
   async function ensureCropAll() { for (const s of state.sources) await ensureCrop(s); }

@@ -60,19 +60,16 @@ export const ui = (function () {
     document.getElementById("labFormat").textContent = STRINGS.format;
     document.getElementById("fmtJpeg").textContent = STRINGS.fmtJpeg;
     document.getElementById("fmtPng").textContent = STRINGS.fmtPng;
-    document.getElementById("btnExport").textContent = STRINGS.exportBtn;
     document.getElementById("labCropRatio").textContent = STRINGS.ratio;
     document.getElementById("cropHint").textContent = STRINGS.cropHint;
     document.getElementById("cropChipOriginal").textContent = STRINGS.original;
     document.getElementById("btnCropReset").textContent = STRINGS.reset;
-    document.getElementById("btnCropExport").textContent = STRINGS.exportBtn;
     document.getElementById("cropExportNote").textContent = STRINGS.cropExportNote;
     document.getElementById("labColRatio").textContent = STRINGS.ratio;
     document.getElementById("labGutter").textContent = STRINGS.gutter;
     document.getElementById("labColMargin").textContent = STRINGS.outerMargin;
     document.getElementById("labGutterColor").textContent = STRINGS.gutterColor;
     document.getElementById("collageHint").textContent = STRINGS.collageHint;
-    document.getElementById("btnCollageExport").textContent = STRINGS.exportBtn;
     document.getElementById("labTiles").textContent = STRINGS.tiles;
     document.getElementById("labTileRatio").textContent = STRINGS.tileRatio;
     document.getElementById("labFill").textContent = STRINGS.fill;
@@ -81,7 +78,6 @@ export const ui = (function () {
     document.getElementById("carouselHint").textContent =
       (state.carousel.adjust === "browse") ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
     document.getElementById("carouselNote").textContent = STRINGS.carouselNote;
-    document.getElementById("btnCarouselExport").textContent = STRINGS.exportBtn;
     document.getElementById("tilesMinus").textContent = "\u2212";
     document.getElementById("labBlur").textContent = STRINGS.blurStrength;
     document.getElementById("labPresets").textContent = STRINGS.presets;
@@ -89,6 +85,7 @@ export const ui = (function () {
     document.getElementById("btnInstall").setAttribute("aria-label", STRINGS.install);
     // newer controls (naming, preview, history, rotate, carousel interaction)
     const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt("lblRevert", STRINGS.revertSlide);
     setTxt("btnSave", STRINGS.save); setTxt("btnExportAll", STRINGS.all);
     setTxt("btnCropSave", STRINGS.save); setTxt("btnCollageSave", STRINGS.save);
     setTxt("btnCarouselSave", STRINGS.save); setTxt("btnCarouselPreview", STRINGS.preview);
@@ -293,10 +290,7 @@ export const ui = (function () {
         pressGroup("#formatSeg button", "fmt", b.dataset.fmt);
         syncFrameRows(); updateExportNote();
       }));
-    // Export
     document.getElementById("btnUndo").addEventListener("click", () => undo.pop());
-    document.getElementById("btnExport").addEventListener("click", () => exporter.run());
-    document.getElementById("btnSave").addEventListener("click", () => exporter.save());
     // Blur strength
     const br = document.getElementById("blurRange");
     br.addEventListener("input", () => {
@@ -361,8 +355,6 @@ export const ui = (function () {
       undo.commit();
     });
     document.getElementById("btnCropReset").addEventListener("click", () => { undo.begin(); cropMode.reset(); syncCropControls(); undo.commit(); });
-    document.getElementById("btnCropExport").addEventListener("click", () => exporter.run());
-    document.getElementById("btnCropSave").addEventListener("click", () => exporter.save());
   }
 
   function syncCollageControls() {
@@ -440,8 +432,6 @@ export const ui = (function () {
       document.getElementById("gutterCustomSw").setAttribute("aria-pressed", "true");
       renderer.draw();
     });
-    document.getElementById("btnCollageExport").addEventListener("click", () => exporter.run());
-    document.getElementById("btnCollageSave").addEventListener("click", () => exporter.save());
   }
 
   function bindCarouselControls() {
@@ -476,8 +466,6 @@ export const ui = (function () {
           state.carousel.adjust === "browse" ? STRINGS.carouselHintBrowse : STRINGS.carouselHintMove;
         sessionStore.scheduleMeta();
       }));
-    document.getElementById("btnCarouselExport").addEventListener("click", () => carouselMode.exportTiles());
-    document.getElementById("btnCarouselSave").addEventListener("click", () => exporter.withDownload(() => carouselMode.exportTiles()));
   }
 
   function setBusy(on) { busy.classList.toggle("show", !!on); }
@@ -545,7 +533,7 @@ export const ui = (function () {
       const nb = document.createElement("div");
       nb.className = "num-badge"; nb.textContent = String(i + 1);
       t.appendChild(nb);
-      if (sl.kind && sl.kind !== "frame") {
+      if (sl.kind === "collage" || sl.kind === "carousel") {
         const kb = document.createElement("div");
         kb.className = "kind-badge";
         kb.textContent = sl.kind === "carousel" ? ("\u00d7" + postModel.slideOutputCount(sl)) : "\u25A6";
@@ -580,7 +568,7 @@ export const ui = (function () {
     const idx = slides.findIndex((s) => s.srcId === state.activeId);
     if (idx < 0 || !state.sources.length) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
-    const kind = slides[idx].kind || "frame";
+    const kind = slides[idx].kind || "plain";
     const pencil = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
     document.getElementById("scPos").innerHTML = pencil + STRINGS.slideWord + " <b>" + (idx + 1) + "</b>&thinsp;/&thinsp;" + slides.length;
     document.getElementById("scType").textContent = (STRINGS.modes && STRINGS.modes[kind]) || kind;
@@ -594,11 +582,30 @@ export const ui = (function () {
     updateExportNote();
     const a = renderer.activeSource();
     if (a && (state.mode === "frame" || state.mode === "carousel" || state.mode === "collage")) {
-      setMode(a.kind || "frame"); // adopt this slide's treatment + sync its controls
+      // Only re-adopt a real treatment. A plain (blank-slate) slide must NOT
+      // snap into frame mode just because it was tapped — that's what made every
+      // new import look auto-framed.
+      if (a.kind && a.kind !== "plain") setMode(a.kind);
     } else if (state.mode === "crop") {
       syncCropControls();
     }
     sessionStore.scheduleMeta();
+  }
+
+  // #6: revert a collage/carousel slide back to a plain photo. Non-destructive —
+  // clearing collage cells lets any consumed sub-photos re-appear as their own
+  // slides (un-merge) rather than deleting them. Undoable.
+  function revertSlide(id) {
+    const src = state.sources.find((s) => s.id === id);
+    if (!src || (src.kind !== "collage" && src.kind !== "carousel")) return;
+    undo.record(() => {
+      if (src.kind === "collage") {
+        src.collage = cloneCollage(state.collage, true); // settings kept, cells emptied
+      }
+      src.kind = "plain";
+    });
+    sessionStore.scheduleMeta();
+    renderer.useActive().then(() => { refreshFilmstrip(); refreshEmpty(); onHistoryChanged(); });
   }
 
   function removeSource(id) {
@@ -652,12 +659,28 @@ export const ui = (function () {
     return !c || (c.ratio === "original" && (c.zoom || 1) === 1 && (c.cx ?? 0.5) === 0.5 && (c.cy ?? 0.5) === 0.5 && !c.flip && !c.rotate);
   }
 
-  function setMode(mode) {
+  function setMode(mode, assignKind = true) {
     state.mode = mode;
-    // Phase C2: frame/carousel are per-slide treatments — remember this slide's kind.
-    if (mode === "frame" || mode === "carousel" || mode === "collage") { const a = renderer.activeSource(); if (a) a.kind = mode; }
+    // Assigning a slide's treatment kind is a USER action (tapping Crop/Frame/
+    // Collage/Carousel). During state RESTORE (undo/session load) we must switch
+    // the UI mode WITHOUT re-writing kind — otherwise restoring kind:"plain" then
+    // calling setMode("carousel") would immediately re-stamp kind:"carousel",
+    // silently defeating the undo. assignKind=false makes restore side-effect-free.
+    if (assignKind && (mode === "frame" || mode === "carousel" || mode === "collage")) {
+      const a = renderer.activeSource();
+      if (a && a.kind !== mode) {
+        undo.record(() => { a.kind = mode; });
+      } else if (a) {
+        a.kind = mode;
+      }
+    }
     document.querySelectorAll(".mode").forEach((b) =>
       b.setAttribute("aria-selected", String(b.dataset.mode === mode)));
+    // #5 one-action-lock: while editing a slide, only the chosen action's tab is
+    // shown (Done -> overview -> pick another). In overview, all tabs are visible.
+    const locked = state.view === "edit";
+    document.querySelectorAll(".mode").forEach((b) =>
+      b.classList.toggle("mode-hidden", locked && b.dataset.mode !== mode));
     document.getElementById("sheetFrame").classList.toggle("hidden", mode !== "frame");
     document.getElementById("sheetCrop").classList.toggle("hidden", mode !== "crop");
     document.getElementById("sheetCollage").classList.toggle("hidden", mode !== "collage");
@@ -808,8 +831,14 @@ export const ui = (function () {
     syncFrameControlsFromState();
     syncCropControls();
     syncCollageControls();
-    setMode(state.mode);
+    setMode(state.mode, false); // restore: switch UI mode only, do NOT re-stamp kind
     updateExportNote();
+    // #7: undo must repaint the ACTIVE view. Previously only edit-view surfaces
+    // were refreshed, so undoing while in the overview left the cards stale until
+    // an unrelated tap triggered postView.sync(). Re-sync here so undo is
+    // immediate in both views. (sync() only re-renders overview cards when in
+    // overview, so this is correct for edit view too.)
+    postView.sync();
   }
 
   // ---- settings + export preview modals -------------------------------------
@@ -916,7 +945,7 @@ export const ui = (function () {
     document.querySelectorAll("#langSeg button").forEach((b) =>
       b.addEventListener("click", () => {
         applyLang(b.dataset.lang);
-        try { setMode(state.mode); } catch (_) {}  // refresh dynamic per-mode labels
+        try { setMode(state.mode, false); } catch (_) {}  // refresh labels only; don't re-stamp kind
         refreshNamePreview();
       }));
     // Preview
@@ -930,10 +959,6 @@ export const ui = (function () {
       const files = pvFiles.slice(), meta = pvMeta; closePreview();
       await exporter.withDownload(() => exporter.deliverMany(files, meta));
     });
-    document.getElementById("btnCarouselPreview").addEventListener("click", () =>
-      openPreview(carouselMode.carouselFiles(), STRINGS.previewCarousel, { mode: "carousel", label: state.carousel.n + " tile" }));
-    document.getElementById("btnExportAll").addEventListener("click", () =>
-      openPreview(exporter.batchFiles(), STRINGS.previewBatch, { mode: "frame", label: "batch " + state.sources.length }));
     // History
     document.getElementById("btnHistory").addEventListener("click", openHistory);
     document.getElementById("historyClose").addEventListener("click", closeHistory);
@@ -941,5 +966,5 @@ export const ui = (function () {
     document.getElementById("histClear").addEventListener("click", async () => { try { await historyStore.clear(); } catch (_) {} renderHistory(); });
   }
 
-  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged, syncCollageControls, removeSource, openPicker, duplicateSlide };
+  return { applyStrings, applyLang, bind, setBusy, toast, refreshEmpty, refreshFilmstrip, setActive, setMode, updateExportNote, syncFrameControlsFromState, renderPresets, updateUndo, applyRestoredState, onHistoryChanged, syncCollageControls, removeSource, openPicker, duplicateSlide, revertSlide };
 })();
