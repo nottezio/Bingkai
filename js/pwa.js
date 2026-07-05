@@ -63,6 +63,40 @@ export const pwa = (function () {
     }).catch((e) => console.warn("SW register failed", e));
   }
 
+  // Self-service SW/cache eviction, exposed in Settings as "Force Update Now".
+  //
+  // ROOT CAUSE this solves: Samsung Internet (and several other mobile browsers)
+  // do not expose a chrome://serviceworker-internals equivalent. When a service
+  // worker gets stuck on a stale cache generation — which can happen even with
+  // updateViaCache:'none' if the CURRENTLY REGISTERED worker predates that fix —
+  // there is no browser UI path to unregister it. "Clear site data" targets
+  // storage APIs (cookies/IndexedDB) but does not reliably force-unregister an
+  // active SW registration on every platform.
+  //
+  // FUNDAMENTAL FIX: the app must be able to evict its own stuck worker rather
+  // than depend on platform tooling that may not exist. This does exactly what
+  // DevTools → Application → Service Workers → Unregister does, from inside the
+  // app, so it works identically regardless of what the browser exposes.
+  async function forceUpdate() {
+    try {
+      if ("serviceWorker" in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+      if ("caches" in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+    } catch (e) {
+      console.warn("forceUpdate cleanup failed", e);
+    } finally {
+      // Bust any remaining HTTP cache on the navigation itself.
+      const url = new URL(location.href);
+      url.searchParams.set("_fu", Date.now().toString(36));
+      location.replace(url.toString());
+    }
+  }
+
   let deferred = null;
   function wireInstall() {
     const btn = document.getElementById("btnInstall");
@@ -76,5 +110,5 @@ export const pwa = (function () {
     window.addEventListener("appinstalled", () => { btn.style.display = "none"; });
   }
 
-  return { installManifest, registerSW, wireInstall };
+  return { installManifest, registerSW, wireInstall, forceUpdate };
 })();

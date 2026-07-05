@@ -12,6 +12,7 @@ import { layoutPicker } from './layoutPicker.js';
 import { persistence } from './persistence.js';
 import { postModel } from './postModel.js';
 import { postView } from './postView.js';
+import { pwa } from './pwa.js';
 import { renderer } from './renderer.js';
 import { sessionStore } from './sessionStore.js';
 import { cloneCarousel, cloneCollage, cloneFrame, state } from './state.js';
@@ -93,6 +94,8 @@ export const ui = (function () {
     setTxt("lblCropRotate", STRINGS.rotate90); setTxt("labTemplate", STRINGS.layout);
     setTxt("labAdjust", STRINGS.interaction); setTxt("adjMove", STRINGS.adjMove); setTxt("adjBrowse", STRINGS.adjBrowse);
     setTxt("settingsTitle", STRINGS.settingsTitle); setTxt("lblNamePrefix", STRINGS.namePrefixLabel);
+    setTxt("lblUpdate", STRINGS.updateLabel); setTxt("btnForceUpdate", STRINGS.forceUpdate);
+    setTxt("forceUpdateHint", STRINGS.forceUpdateHint);
     setTxt("lblNameMode", STRINGS.numberingLabel); setTxt("nameModeDate", STRINGS.numberDate); setTxt("nameModeSeq", STRINGS.numberSeq);
     setTxt("lblLanguage", STRINGS.language);
     setTxt("historyTitle", STRINGS.historyTitle); setTxt("histEmpty", STRINGS.historyEmpty); setTxt("histClear", STRINGS.clearAll);
@@ -857,9 +860,21 @@ export const ui = (function () {
     document.getElementById("namePrefix").value = state.exportName.prefix || "";
     pressGroup("#nameModeSeg button", "m", state.exportName.mode || "date");
     refreshNamePreview();
+    updateBuildInfo();
     document.getElementById("settingsModal").classList.add("show");
   }
   function closeSettings() { document.getElementById("settingsModal").classList.remove("show"); }
+
+  // Surfaces exactly which build + how many SW registrations/caches are active,
+  // so "did the update land" is answerable without dev tools.
+  async function updateBuildInfo() {
+    const el = document.getElementById("buildInfo");
+    if (!el) return;
+    let swCount = "?", cacheCount = "?";
+    try { swCount = (await navigator.serviceWorker.getRegistrations()).length; } catch (_) {}
+    try { cacheCount = (await caches.keys()).length; } catch (_) {}
+    el.textContent = `Build ${CONFIG.BUILD} \u00b7 ${swCount} service worker(s) \u00b7 ${cacheCount} cache(s)`;
+  }
 
   let pvFiles = [], pvUrls = [], pvMeta = null;
   function clearPvUrls() { pvUrls.forEach((u) => { try { URL.revokeObjectURL(u); } catch (_) {} }); pvUrls = []; }
@@ -934,6 +949,11 @@ export const ui = (function () {
     document.getElementById("btnSettings").addEventListener("click", openSettings);
     document.getElementById("settingsClose").addEventListener("click", closeSettings);
     document.getElementById("settingsModal").addEventListener("click", (e) => { if (e.target.id === "settingsModal") closeSettings(); });
+    document.getElementById("btnForceUpdate").addEventListener("click", async () => {
+      const btn = document.getElementById("btnForceUpdate");
+      btn.disabled = true; btn.textContent = "Updating\u2026";
+      await pwa.forceUpdate(); // navigates away; nothing after this line runs
+    });
     document.getElementById("namePrefix").addEventListener("input", (e) => {
       state.exportName.prefix = e.target.value;
       persistence.scheduleSave(); refreshNamePreview();

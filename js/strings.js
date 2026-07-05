@@ -51,6 +51,8 @@ export const STRINGS_EN = {
   blurStrength: "Blur strength", install: "Install app",
   // settings / history / newer controls
   settingsTitle: "Settings", namePrefixLabel: "Export name prefix", numberingLabel: "Numbering",
+  updateLabel: "App Update", forceUpdate: "Force Update Now",
+  forceUpdateHint: "Clears the cached app and reloads. Use this if a new version doesn't appear after uploading changes.",
   numberDate: "Date/time", numberSeq: "Sequence", language: "Language", example: "Example: ",
   historyTitle: "Export history", historyEmpty: "No exports yet.", clearAll: "Clear all",
   save: "Save", preview: "Preview", all: "All", rotate90: "Rotate 90\u00b0", layout: "Layout",
@@ -116,6 +118,8 @@ export const STRINGS_ID = {
   presetSaved: "Preset disimpan.", deletePreset: "Hapus preset ini?",
   blurStrength: "Kekuatan blur", install: "Pasang aplikasi",
   settingsTitle: "Pengaturan", namePrefixLabel: "Awalan nama ekspor", numberingLabel: "Penomoran",
+  updateLabel: "Pembaruan Aplikasi", forceUpdate: "Paksa Perbarui Sekarang",
+  forceUpdateHint: "Menghapus cache aplikasi dan memuat ulang. Gunakan ini jika versi baru tidak muncul setelah mengunggah perubahan.",
   numberDate: "Tanggal/waktu", numberSeq: "Urutan", language: "Bahasa", example: "Contoh: ",
   historyTitle: "Riwayat ekspor", historyEmpty: "Belum ada ekspor.", clearAll: "Hapus semua",
   save: "Simpan", preview: "Pratinjau", all: "Semua", rotate90: "Putar 90\u00b0", layout: "Tata letak",
