@@ -89,11 +89,17 @@ export const cropDebug = (function () {
     if (panel || !ON) return;
     panel = document.createElement("div");
     panel.id = "cropDebugPanel";
+    // Docked to the TOP, below the topbar + status marquee (~76px), NOT the
+    // bottom — the bottom is where the CROP/FRAME/COLLAGE toolbar lives, and a
+    // bottom-pinned panel covered it (untappable on mobile). The top strip below
+    // the marquee has no interactive controls, so nothing is obstructed here.
+    // Height is capped well short of the toolbar zone.
     panel.style.cssText = [
-      "position:fixed", "left:0", "right:0", "bottom:0", "z-index:9999",
-      "max-height:42vh", "overflow:auto", "background:#000", "color:#0F0",
+      "position:fixed", "left:0", "right:0", "top:76px", "z-index:9999",
+      "max-height:34vh", "overflow:auto", "background:rgba(0,0,0,0.92)", "color:#0F0",
       "font:11px/1.35 'Courier New',monospace", "padding:6px 8px",
-      "border-top:2px solid #0F0", "white-space:pre-wrap", "pointer-events:auto",
+      "border-top:2px solid #0F0", "border-bottom:2px solid #0F0",
+      "white-space:pre-wrap", "pointer-events:auto",
     ].join(";");
     document.body.appendChild(panel);
   }

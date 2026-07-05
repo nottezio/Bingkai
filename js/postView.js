@@ -42,6 +42,20 @@ export const postView = (function () {
     const total = postModel.totalOutputs(slides);
     const right = document.getElementById("poHeadRight");
     if (right) right.textContent = slides.length + (slides.length === 1 ? " slide" : " slides") + " \u00b7 " + total + " image" + (total === 1 ? "" : "s");
+    // Set --po-h from the strip's REAL height (getBoundingClientRect accounts for
+    // the mobile browser's URL bar; 100vh would overshoot). Cards/add-tile read
+    // this so previews fill the actual visible area, not a phantom taller one.
+    requestAnimationFrame(() => sizeStrip());
+  }
+
+  function sizeStrip() {
+    const strip = document.getElementById("poStrip");
+    if (!strip) return;
+    // subtract the strip's own vertical padding so the card doesn't overflow it
+    const cs = getComputedStyle(strip);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const h = Math.max(80, Math.round(strip.clientHeight - padY));
+    strip.style.setProperty("--po-h", h + "px");
   }
 
   async function selectCard(id) {
@@ -129,6 +143,12 @@ export const postView = (function () {
       const card = e.target.closest(".po-card");
       if (card) selectCard(card.dataset.id);
     });
+    // The mobile URL bar shows/hides on scroll, changing the visible height;
+    // re-measure so previews always fill the actual available space.
+    let rt = null;
+    const reflow = () => { clearTimeout(rt); rt = setTimeout(sizeStrip, 100); };
+    window.addEventListener("resize", reflow);
+    window.addEventListener("orientationchange", reflow);
   }
 
   return { bind, sync, renderOverview, exitEdit };

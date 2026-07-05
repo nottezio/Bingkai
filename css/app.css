@@ -205,21 +205,33 @@
   .po-strip {
     flex: 1 1 auto; min-height: 0; display: flex;
     align-items: center; justify-content: safe center;
-    gap: 12px; overflow-x: auto; overflow-y: hidden; padding: 4px 0;
+    gap: 12px; overflow-x: auto; overflow-y: hidden; padding: 6px 0;
   }
   .po-strip::-webkit-scrollbar { display: none; }
+  /* The card is a pure wrapper — it takes its size ENTIRELY from the canvas
+     inside it (no height/max-height of its own). Giving the card a height while
+     the canvas sizes to the card created a circular dependency that resolved
+     inconsistently across browsers (fine in headless Chromium, collapsed/crammed
+     in Samsung Browser). Now there is a single height authority: the strip's real
+     flex height, which the canvas reads directly. */
   .po-card {
     position: relative; flex: 0 0 auto;
-    width: fit-content; height: fit-content; max-height: 100%;
     background: #fff;
     border: 2px solid; border-color: var(--bevel-hi) var(--bevel-sh) var(--bevel-sh) var(--bevel-hi);
     box-shadow: inset -1px -1px 0 var(--bevel-deep), inset 1px 1px 0 var(--bevel-inner);
     cursor: pointer; overflow: hidden; line-height: 0;
   }
+  /* --po-h is set in JS from the strip's REAL measured height (getBoundingClientRect),
+     which is correct on mobile browsers where 100vh overshoots by the URL-bar
+     height. Canvas fits within that height OR 92vw width, whichever binds first —
+     so portrait binds on height, landscape binds on width, neither letterboxes,
+     and the card hugs the canvas tightly on both axes (no phantom frame). */
   .po-card canvas, .po-card img {
     display: block;
-    max-height: 100%; max-width: 90vw;
-    width: auto; height: auto;
+    max-height: var(--po-h, 60vh);
+    max-width: 92vw;
+    width: auto;
+    height: auto;
   }
   .po-card.selected {
     border-color: var(--bevel-sh) var(--bevel-hi) var(--bevel-hi) var(--bevel-sh);
@@ -684,7 +696,9 @@
   /* post-overview "add" tile + heading emphasis */
   .po-head b { font-weight: bold; }
   .po-add {
-    flex: 0 0 auto; width: 64px; height: calc(100vh - 220px); max-height: 100%; background: var(--panel);
+    flex: 0 0 auto; align-self: center; width: 64px;
+    height: var(--po-h, 60vh); max-height: var(--po-h, 60vh);
+    background: var(--panel);
     display: flex; align-items: center; justify-content: center;
     color: #000; font-family: var(--font-head); font-size: 34px; font-weight: 900; cursor: pointer;
     border: 2px dashed; border-color: #808080;
