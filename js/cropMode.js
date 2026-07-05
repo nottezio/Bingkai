@@ -139,18 +139,39 @@ export const cropMode = (function () {
           factor: d / pinchPrev, fx, fy,
         });
         c.zoom = z.zoom;
-        c.cx = z.centerX / src.w;
-        c.cy = z.centerY / src.h;
-        syncCenterFrom(boxFor(src.w, src.h), src.w, src.h);
+        // Atomic clamp (same rationale as the pan path): derive the clamped
+        // center from the post-zoom box and assign in one step, never leaving an
+        // unclamped cx/cy for a concurrent bake to observe.
+        const zbox = geometryCore.computeCropBoxLocked({
+          sourceW: src.w, sourceH: src.h, ratioW: r.w, ratioH: r.h,
+          zoom: z.zoom, centerX: z.centerX, centerY: z.centerY,
+        });
+        c.cx = (zbox.x + zbox.w / 2) / src.w;
+        c.cy = (zbox.y + zbox.h / 2) / src.h;
       }
       pinchPrev = d;
     } else {
       // Pan: the IMAGE follows the finger, so the source point under the frame
       // centre moves opposite to the drag.
+      //
+      // ATOMIC CLAMP: compute the desired raw center, run it through the box
+      // clamp, and write the CLAMPED center back to c in one synchronous step.
+      // Previously c.cx/c.cy were set to raw (possibly out-of-range) values and
+      // only reconciled by a following syncCenterFrom() call — leaving a window
+      // where c held an unclamped center. A bake firing in that window baked the
+      // wrong region AND stamped a matching _cropSig, producing the intermittent
+      // "export shows an area N px off from the box" desync (diagnostic caught it
+      // as BOX-MISMATCH Δ(0,495,0,0) with no dims change).
       const c = cur();
-      c.cx -= dx / (scale * src.w);
-      c.cy -= dy / (scale * src.h);
-      syncCenterFrom(boxFor(src.w, src.h), src.w, src.h);
+      const rawCx = c.cx - dx / (scale * src.w);
+      const rawCy = c.cy - dy / (scale * src.h);
+      const r = ratioNums();
+      const clampedBox = geometryCore.computeCropBoxLocked({
+        sourceW: src.w, sourceH: src.h, ratioW: r.w, ratioH: r.h,
+        zoom: c.zoom, centerX: rawCx * src.w, centerY: rawCy * src.h,
+      });
+      c.cx = (clampedBox.x + clampedBox.w / 2) / src.w;
+      c.cy = (clampedBox.y + clampedBox.h / 2) / src.h;
     }
     renderer.draw();
   }
