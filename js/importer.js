@@ -15,12 +15,34 @@ export const importer = (function () {
   // `imageOrientation:'from-image'` makes the decoder apply the EXIF transform,
   // so intrinsic w/h are the *visual* dimensions — no manual EXIF parsing.
   async function decodeOriented(blob) {
+    let bmp;
     try {
-      return await createImageBitmap(blob, { imageOrientation: "from-image" });
+      bmp = await createImageBitmap(blob, { imageOrientation: "from-image" });
     } catch (e) {
       // Fallback path: some engines reject the options bag. Decode raw, then
       // the rotation may be wrong — acceptable degraded mode, flagged to user.
-      return await createImageBitmap(blob);
+      bmp = await createImageBitmap(blob);
+    }
+    // FLATTEN orientation into a plain raster. Root cause of the "right size,
+    // wrong region" crop export: on an EXIF-oriented bitmap, Samsung Internet
+    // disagrees between drawImage(bmp,...) (used by the live crop PREVIEW) and
+    // createImageBitmap(bmp, sx,sy,sw,sh) (the crop BAKE sub-rect) about which
+    // buffer sx/sy index — oriented vs raw. Same box, two different rasters, so
+    // preview and export show different areas while the box coordinates match
+    // (which is why the coordinate-level diagnostic reads green). Drawing the
+    // oriented pixels once into a canvas bakes the orientation in and strips the
+    // metadata, so every downstream API (preview + bake) reads ONE raster.
+    try {
+      const cv = (typeof OffscreenCanvas !== "undefined")
+        ? new OffscreenCanvas(bmp.width, bmp.height)
+        : Object.assign(document.createElement("canvas"), { width: bmp.width, height: bmp.height });
+      const ctx = cv.getContext("2d");
+      ctx.drawImage(bmp, 0, 0);
+      const flat = await createImageBitmap(cv);
+      try { bmp.close(); } catch (_) {}
+      return flat;
+    } catch (_) {
+      return bmp; // degraded: couldn't flatten — use the oriented bitmap as-is
     }
   }
 
