@@ -55,11 +55,25 @@ export const cropDebug = (function () {
   // --- hooks (all no-op when OFF) ---------------------------------------------
 
   // The preview drew this crop region for src (what the user is looking at).
+  function bmDims(src) {
+    const b = src && src.bitmap;
+    return b ? { bmW: b.width, bmH: b.height } : { bmW: null, bmH: null };
+  }
+  // src.w/src.h define the coordinate space the crop box lives in. src.bitmap is
+  // the raster the preview draws AND the bake samples. If they disagree, the SAME
+  // box maps to DIFFERENT pixels in preview vs export — same numbers, wrong area.
+  function spaceMismatch(src) {
+    const { bmW, bmH } = bmDims(src);
+    return bmW != null && (bmW !== src.w || bmH !== src.h);
+  }
+
   function previewBox(src, box, sig) {
     if (!ON || !src || !box) return;
-    lastPreview = Object.assign({ id: src.id, t: Math.round(performance.now()) },
+    const { bmW, bmH } = bmDims(src);
+    lastPreview = Object.assign({ id: src.id, t: Math.round(performance.now()), bmW, bmH, spaceBad: spaceMismatch(src) },
       regionOf(box, src.w, src.h, sig));
-    render(); // v2: keep the readout honest — previously this never re-rendered.
+    if (lastPreview.spaceBad) push("space", { where: "preview", w: src.w, h: src.h, bmW, bmH, bad: true });
+    else render();
   }
 
   function rotationStart() { if (ON) rotationsInFlight++; }
@@ -72,6 +86,8 @@ export const cropDebug = (function () {
   function bakeCommit(src, box, capturedW, capturedH, sig) {
     if (!ON || !src) return;
     const bakeBox = regionOf(box, capturedW, capturedH, sig);
+    const { bmW, bmH } = bmDims(src);
+    const spaceBad = (bmW != null && (bmW !== capturedW || bmH !== capturedH));
     const dimsChanged = (src.w !== capturedW || src.h !== capturedH);
     let boxMismatch = false, deltas = null, comparable = false;
     if (lastPreview && lastPreview.id === src.id && lastPreview.sig === sig) {
@@ -85,7 +101,7 @@ export const cropDebug = (function () {
       deltas = { dx, dy, dw, dh };
     }
     push("bake", { bakeBox, rot: rotationsInFlight, dimsChanged, boxMismatch, comparable, deltas,
-      bad: dimsChanged || boxMismatch });
+      bmW, bmH, spaceBad, bad: dimsChanged || boxMismatch || spaceBad });
   }
 
   // The export actually drew THIS source region into the output. `path` names
@@ -135,7 +151,11 @@ export const cropDebug = (function () {
         const d = e.comparable ? ` Δ(${e.deltas.dx},${e.deltas.dy},${e.deltas.dw},${e.deltas.dh})` : " (sig≠preview — skipped)";
         const extras = [e.dimsChanged ? "DIMS-CHANGED" : "", e.boxMismatch ? "BOX-MISMATCH" : "",
           e.rot ? `rot:${e.rot}` : ""].filter(Boolean).join(" ");
-        return `${e.t}  bake ${fmtBox(e.bakeBox)}${d} ${extras}${e.bad ? "  <<< DESYNC" : ""}`;
+        const sp = e.spaceBad ? `  bitmap ${e.bmW}x${e.bmH} <<< SPACE-MISMATCH` : "";
+        return `${e.t}  bake ${fmtBox(e.bakeBox)}${d} ${extras}${sp}${e.bad && !e.spaceBad ? "  <<< DESYNC" : ""}`;
+      }
+      if (e.kind === "space") {
+        return `${e.t}  SPACE-MISMATCH(${e.where}) box-space ${e.w}x${e.h} vs bitmap ${e.bmW}x${e.bmH}  <<< WRONG COORDINATE SPACE`;
       }
       if (e.kind === "export") {
         const d = e.comparable ? ` Δ(${e.deltas.dx},${e.deltas.dy},${e.deltas.dw},${e.deltas.dh})` : " (no preview for src)";
