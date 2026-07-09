@@ -198,7 +198,7 @@ export const cropMode = (function () {
     if (!src) return;
     const fr = frameRect(wsW, wsH);
     const box = boxFor(src.w, src.h);
-    cropDebug.previewBox(src, box);
+    cropDebug.previewBox(src, box, renderer.cropSig(src.crop));
     const scale = frameScale(fr, box);
     const ix = fr.x - box.x * scale, iy = fr.y - box.y * scale;
     const iw = src.w * scale, ih = src.h * scale;

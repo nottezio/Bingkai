@@ -1,5 +1,6 @@
 import { collageMode } from './collageMode.js';
 import { compositor } from './compositor.js';
+import { cropDebug } from './cropDebug.js';
 import { exporter } from './exporter.js';
 import { geometryCore } from './geometryCore.js';
 import { postModel } from './postModel.js';
@@ -37,6 +38,7 @@ export const postPreview = (function () {
       return cv;
     }
     const f = src.frame || state.frame;
+    if (src._bakedRegion) cropDebug.exportRegion(src, src._bakedRegion, "thumb");
     const r = compositor.frameRatio(f, eff.w, eff.h);
     const H = targetH, W = Math.max(1, Math.round(H * (r.w / r.h)));
     const cv = document.createElement("canvas");

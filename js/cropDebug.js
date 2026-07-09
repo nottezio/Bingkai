@@ -1,18 +1,26 @@
-/* Bingkai — crop desync diagnostic (TEMPORARY).
+/* Bingkai — crop WYSIWYG diagnostic (TEMPORARY).
  *
- * Purpose: the "crop shows a different area than the box, randomly" bug cannot
- * be reproduced in the headless test sandbox (its createImageBitmap timing is
- * too deterministic to expose the async interleave). This module instruments
- * the REAL app so that, on the device where the bug actually occurs, we capture
- * the exact numbers: the crop box the PREVIEW drew vs. the box the BAKE used,
- * plus whether a rotation was in flight.
+ * v2 rationale (why the previous version never caught the real bug):
+ *   The old check compared the box the PREVIEW computed vs the box the BAKE
+ *   computed. BOTH are derived from the same src.crop via the same pure
+ *   computeCropBoxLocked(). So if cx/cy is ever corrupted to a wrong-but-
+ *   consistent value, both sides read the SAME wrong value and the check logs
+ *   Δ(0,0,0,0) — green — while the export is wrong. It was structurally blind to
+ *   the "right size, wrong region" failure. It also never called render() from
+ *   previewBox(), so the "last preview box" readout was frozen one bake behind
+ *   (the phantom [0,0 WxH] that derailed every debugging session).
  *
- * Activation: add ?debug=crop to the URL (e.g. nottezio.github.io/Bingkai/?debug=crop).
- * When off (normal use) this module does nothing measurable — all hooks no-op.
+ * v2 measures the axis that actually matters — WYSIWYG:
+ *   previewBox()  = the region the user LAST SAW under the crop frame.
+ *   exportRegion()= the region actually written to the exported/baked image,
+ *                   measured from the bake's captured sub-rect (NOT re-derived
+ *                   from src.crop). If these disagree, the export ≠ what the user
+ *                   positioned => WYSIWYG-BREAK, logged with the export path name.
+ *   Sig-gated bakeCommit stops the ratio-change false positive: a bake is only
+ *   compared to a preview recorded for the SAME crop signature.
  *
- * REMOVAL: delete this file, its <script>/import in index.html, and the three
- * `cropDebug.*` call sites in renderer.js / importer.js / cropMode.js. Grep
- * `cropDebug` to find them all.
+ * Activation: ?debug=crop. REMOVAL: delete this file + its import in index.html
+ * + the cropDebug.* call sites (grep cropDebug).
  */
 'use strict';
 
@@ -22,12 +30,10 @@ export const cropDebug = (function () {
     catch (_) { return false; }
   })();
 
-  // Ring buffer of recent events so a desync's lead-up is visible, not just the
-  // final frame.
   const log = [];
   const MAX = 40;
   let rotationsInFlight = 0;
-  let lastPreviewBox = null;   // {sx,sy,sw,sh,w,h,ratio,t}
+  let lastPreview = null;   // {id,sx,sy,sw,sh,w,h,sig,t}
   let panel = null;
 
   function push(kind, data) {
@@ -38,62 +44,77 @@ export const cropDebug = (function () {
     render();
   }
 
-  // --- hooks called from the app (all no-op when OFF) --------------------------
-
-  // Preview drew a crop box for this source at these dims.
-  function previewBox(src, box) {
-    if (!ON || !src || !box) return;
-    lastPreviewBox = {
+  function regionOf(box, w, h, sig) {
+    return {
       sx: Math.round(box.x), sy: Math.round(box.y),
       sw: Math.round(box.w), sh: Math.round(box.h),
-      w: src.w, h: src.h, t: Math.round(performance.now()),
+      w, h, sig: sig == null ? null : sig,
     };
+  }
+
+  // --- hooks (all no-op when OFF) ---------------------------------------------
+
+  // The preview drew this crop region for src (what the user is looking at).
+  function previewBox(src, box, sig) {
+    if (!ON || !src || !box) return;
+    lastPreview = Object.assign({ id: src.id, t: Math.round(performance.now()) },
+      regionOf(box, src.w, src.h, sig));
+    render(); // v2: keep the readout honest — previously this never re-rendered.
   }
 
   function rotationStart() { if (ON) rotationsInFlight++; }
   function rotationEnd() { if (ON) rotationsInFlight = Math.max(0, rotationsInFlight - 1); }
 
-  // Bake committed a crop. Compare against what the preview last drew.
-  function bakeCommit(src, box, capturedW, capturedH) {
+  // A bake committed. Only a REAL divergence is one where the preview and the
+  // bake share the same crop signature yet disagree on the box. Different sig =>
+  // the preview simply hasn't redrawn for this state yet (e.g. applyChange bakes
+  // before it draws) — that is not a desync, so we don't flag it.
+  function bakeCommit(src, box, capturedW, capturedH, sig) {
     if (!ON || !src) return;
-    const bakeBox = {
-      sx: Math.round(box.x), sy: Math.round(box.y),
-      sw: Math.round(box.w), sh: Math.round(box.h),
-      w: capturedW, h: capturedH,
-    };
-    // Desync 1: dims changed between the synchronous capture and the commit
-    //   (a rotation swapped src.w/src.h out from under the bake).
+    const bakeBox = regionOf(box, capturedW, capturedH, sig);
     const dimsChanged = (src.w !== capturedW || src.h !== capturedH);
-    // Desync 2: the box the bake used disagrees with the box the preview drew,
-    //   beyond a rounding tolerance.
-    let boxMismatch = false, deltas = null;
-    if (lastPreviewBox) {
-      const dx = Math.abs(lastPreviewBox.sx - bakeBox.sx);
-      const dy = Math.abs(lastPreviewBox.sy - bakeBox.sy);
-      const dw = Math.abs(lastPreviewBox.sw - bakeBox.sw);
-      const dh = Math.abs(lastPreviewBox.sh - bakeBox.sh);
-      const dimsAgree = (lastPreviewBox.w === bakeBox.w && lastPreviewBox.h === bakeBox.h);
+    let boxMismatch = false, deltas = null, comparable = false;
+    if (lastPreview && lastPreview.id === src.id && lastPreview.sig === sig) {
+      comparable = true;
+      const dx = Math.abs(lastPreview.sx - bakeBox.sx);
+      const dy = Math.abs(lastPreview.sy - bakeBox.sy);
+      const dw = Math.abs(lastPreview.sw - bakeBox.sw);
+      const dh = Math.abs(lastPreview.sh - bakeBox.sh);
+      const dimsAgree = (lastPreview.w === bakeBox.w && lastPreview.h === bakeBox.h);
       boxMismatch = !dimsAgree || dx > 2 || dy > 2 || dw > 2 || dh > 2;
-      deltas = { dx, dy, dw, dh, previewW: lastPreviewBox.w, previewH: lastPreviewBox.h };
+      deltas = { dx, dy, dw, dh };
     }
-    push("bake", {
-      bakeBox, rot: rotationsInFlight,
-      dimsChanged, boxMismatch, deltas,
-      bad: dimsChanged || boxMismatch,
-    });
+    push("bake", { bakeBox, rot: rotationsInFlight, dimsChanged, boxMismatch, comparable, deltas,
+      bad: dimsChanged || boxMismatch });
   }
 
-  // --- visible readout ---------------------------------------------------------
+  // The export actually drew THIS source region into the output. `path` names
+  // the export route (post/batch/inCrop). This is the (b) detector: compare the
+  // exported region to what the user last saw for this source.
+  function exportRegion(src, region, path) {
+    if (!ON || !src || !region) return;
+    const r = { sx: region.sx, sy: region.sy, sw: region.sw, sh: region.sh, w: region.w, h: region.h };
+    let wysiwygBreak = false, deltas = null, comparable = false;
+    if (lastPreview && lastPreview.id === src.id) {
+      comparable = true;
+      const dx = Math.abs(lastPreview.sx - r.sx);
+      const dy = Math.abs(lastPreview.sy - r.sy);
+      const dw = Math.abs(lastPreview.sw - r.sw);
+      const dh = Math.abs(lastPreview.sh - r.sh);
+      const dimsAgree = (lastPreview.w === r.w && lastPreview.h === r.h);
+      // tol 2px on position/size; dims must match exactly (rotation would change them)
+      wysiwygBreak = !dimsAgree || dx > 2 || dy > 2 || dw > 2 || dh > 2;
+      deltas = { dx, dy, dw, dh };
+    }
+    push("export", { path: path || "?", region: r, wysiwygBreak, comparable, deltas, bad: wysiwygBreak });
+  }
+
+  // --- readout ----------------------------------------------------------------
 
   function ensurePanel() {
     if (panel || !ON) return;
     panel = document.createElement("div");
     panel.id = "cropDebugPanel";
-    // Docked to the TOP, below the topbar + status marquee (~76px), NOT the
-    // bottom — the bottom is where the CROP/FRAME/COLLAGE toolbar lives, and a
-    // bottom-pinned panel covered it (untappable on mobile). The top strip below
-    // the marquee has no interactive controls, so nothing is obstructed here.
-    // Height is capped well short of the toolbar zone.
     panel.style.cssText = [
       "position:fixed", "left:0", "right:0", "top:76px", "z-index:9999",
       "max-height:34vh", "overflow:auto", "background:rgba(0,0,0,0.92)", "color:#0F0",
@@ -110,27 +131,26 @@ export const cropDebug = (function () {
     if (!ON) return;
     ensurePanel();
     const rows = log.slice(-14).map((e) => {
-      if (e.kind !== "bake") return `${e.t}  ${e.kind}`;
-      const flag = e.bad ? "  <<< DESYNC" : "";
-      const d = e.deltas
-        ? ` Δ(${e.deltas.dx},${e.deltas.dy},${e.deltas.dw},${e.deltas.dh}) prevDims ${e.deltas.previewW}x${e.deltas.previewH}`
-        : " (no preview box yet)";
-      const extras = [
-        e.dimsChanged ? "DIMS-CHANGED" : "",
-        e.boxMismatch ? "BOX-MISMATCH" : "",
-        e.rot ? `rot-inflight:${e.rot}` : "",
-      ].filter(Boolean).join(" ");
-      return `${e.t}  bake ${fmtBox(e.bakeBox)}${d}  ${extras}${flag}`;
+      if (e.kind === "bake") {
+        const d = e.comparable ? ` Δ(${e.deltas.dx},${e.deltas.dy},${e.deltas.dw},${e.deltas.dh})` : " (sig≠preview — skipped)";
+        const extras = [e.dimsChanged ? "DIMS-CHANGED" : "", e.boxMismatch ? "BOX-MISMATCH" : "",
+          e.rot ? `rot:${e.rot}` : ""].filter(Boolean).join(" ");
+        return `${e.t}  bake ${fmtBox(e.bakeBox)}${d} ${extras}${e.bad ? "  <<< DESYNC" : ""}`;
+      }
+      if (e.kind === "export") {
+        const d = e.comparable ? ` Δ(${e.deltas.dx},${e.deltas.dy},${e.deltas.dw},${e.deltas.dh})` : " (no preview for src)";
+        return `${e.t}  EXPORT(${e.path}) ${fmtBox(e.region)}${d}${e.wysiwygBreak ? "  <<< WYSIWYG-BREAK" : ""}`;
+      }
+      return `${e.t}  ${e.kind}`;
     });
     const anyBad = log.some((e) => e.bad);
     panel.innerHTML =
-      `CROP DEBUG${anyBad ? "  — DESYNC DETECTED (screenshot this)" : "  — watching…"}\n` +
-      `last preview box: ${fmtBox(lastPreviewBox)}\n` +
-      "─".repeat(40) + "\n" +
-      rows.join("\n");
+      `CROP DEBUG v2${anyBad ? "  — MISMATCH DETECTED (screenshot this)" : "  — watching…"}\n` +
+      `last preview: ${fmtBox(lastPreview)}\n` +
+      "\u2500".repeat(40) + "\n" + rows.join("\n");
     panel.style.borderTopColor = anyBad ? "#F00" : "#0F0";
     panel.style.color = anyBad ? "#F88" : "#0F0";
   }
 
-  return { on: ON, previewBox, bakeCommit, rotationStart, rotationEnd };
+  return { on: ON, previewBox, bakeCommit, exportRegion, rotationStart, rotationEnd };
 })();

@@ -92,8 +92,11 @@ export const renderer = (function () {
     src.croppedBitmap = baked;
     src.cropDims = { w: baked.width, h: baked.height };
     src._cropSig = sig; // sig captured pre-await, guaranteed to match THESE pixels
+    // Record the ACTUAL captured sub-rect so export instrumentation can compare
+    // the exported region against what the preview showed (WYSIWYG check).
+    src._bakedRegion = { sx, sy, sw: Math.max(1, sw), sh: Math.max(1, sh), w: srcW, h: srcH, sig };
     if (prev) { try { prev.close(); } catch (_) {} }
-    cropDebug.bakeCommit(src, box, srcW, srcH);
+    cropDebug.bakeCommit(src, box, srcW, srcH, sig);
   }
   async function bakeCropActive() { await bakeCrop(activeSource()); }
 
@@ -189,5 +192,5 @@ export const renderer = (function () {
     ctx.drawImage(src.bitmap, fit.x, fit.y, fit.w, fit.h);
   }
 
-  return { useActive, draw, clear, activeSource, sizeStage, effective, bakeCrop, bakeCropActive, ensureCrop, ensureCropAll };
+  return { useActive, draw, clear, activeSource, sizeStage, effective, bakeCrop, bakeCropActive, ensureCrop, ensureCropAll, cropSig };
 })();

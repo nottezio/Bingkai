@@ -3,6 +3,7 @@ import { collageMode } from './collageMode.js';
 import { compositor } from './compositor.js';
 import { CONFIG } from './config.js';
 import { cropMode } from './cropMode.js';
+import { cropDebug } from './cropDebug.js';
 import { historyStore } from './historyStore.js';
 import { persistence } from './persistence.js';
 import { postModel } from './postModel.js';
@@ -149,12 +150,14 @@ export const exporter = (function () {
     } else if (isCrop) {
       const eb = cropMode.exportBox();                 // box in full-res source px
       const r = eb.ratio;                              // crop ratio numbers
+      cropDebug.exportRegion(src, { sx: Math.max(0, Math.round(eb.box.x)), sy: Math.max(0, Math.round(eb.box.y)), sw: Math.round(eb.box.w), sh: Math.round(eb.box.h), w: src.w, h: src.h }, "run:inCrop");
       ({ Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig));
       ratioLabel = (src.crop && src.crop.ratio && src.crop.ratio !== "original") ? src.crop.ratio : "potong";
       draw = (ctx) => ctx.drawImage(src.bitmap, eb.box.x, eb.box.y, eb.box.w, eb.box.h, 0, 0, Cw, Ch);
     } else {
       const f = state.frame;
       const eff = renderer.effective(src);
+      if (src._bakedRegion) cropDebug.exportRegion(src, src._bakedRegion, "run:frame");
       const r = compositor.frameRatio(f, eff.w, eff.h);
       ({ Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig));
       ratioLabel = f.ratio;
@@ -198,6 +201,7 @@ export const exporter = (function () {
       i++;
       const f = src.frame || state.frame; // per-slide frame settings
       const eff = renderer.effective(src);
+      if (src._bakedRegion) cropDebug.exportRegion(src, src._bakedRegion, "batch");
       const r = compositor.frameRatio(f, eff.w, eff.h);
       const { Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig);
       const cv = document.createElement("canvas");
@@ -240,6 +244,7 @@ export const exporter = (function () {
     const opt = state.exportOpt;
     const f = src.frame || state.frame;
     const eff = renderer.effective(src);
+    if (src._bakedRegion) cropDebug.exportRegion(src, src._bakedRegion, "post");
     const r = compositor.frameRatio(f, eff.w, eff.h);
     const { Cw, Ch } = compositor.exportDims(r.w, r.h, opt.ig);
     const cv = document.createElement("canvas");
