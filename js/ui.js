@@ -512,8 +512,8 @@ export const ui = (function () {
     const msg = n === 0
       ? STRINGS.marqueeEmpty
       : STRINGS.marqueeStats.replace("{slides}", slides).replace("{sources}", n);
-    const stamped = msg + "\u00A0\u00A0\u00B7\u00A0\u00A0BUILD " + CONFIG.BUILD;
-    track.textContent = stamped + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0" + stamped + "\u00A0\u00A0\u00A0\u2605\u00A0\u00A0\u00A0";
+    // Version moved to Settings (buildInfo); status shown in full, wrapped, no scroll.
+    track.textContent = msg;
   }
 
   function updateBatchBtn() {

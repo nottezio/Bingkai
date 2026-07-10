@@ -52,16 +52,16 @@ export const postView = (function () {
     const strip = document.getElementById("poStrip");
     if (!strip) return;
     // subtract the strip's own vertical padding so the card doesn't overflow it
-    const cs = getComputedStyle(strip);
-    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    // The slide-actions bar is position:absolute and overlays the bottom of the
-    // strip; subtract its height so the preview centres in the VISIBLE area
-    // (was overflowing under the bar with empty space at the top). The 0.92
-    // factor leaves symmetric breathing room, matching the reference apps.
+    // The slide-actions bar is position:absolute and overlays the strip's bottom,
+    // so align-items:center was centring the card into hidden space (big gap at
+    // top, card sitting low). Pad the strip bottom by the bar height (--po-safe)
+    // so the card centres in the VISIBLE area, then size it to the padded space.
     const sa = document.getElementById("slideActions");
-    const saH = (sa && sa.classList.contains("show")) ? sa.getBoundingClientRect().height : 0;
-    const avail = strip.clientHeight - padY - saH;
-    const h = Math.max(80, Math.round(avail * 0.92));
+    const saH = (sa && sa.classList.contains("show")) ? Math.round(sa.getBoundingClientRect().height) : 0;
+    strip.style.setProperty("--po-safe", saH + "px");
+    const cs2 = getComputedStyle(strip);
+    const padY2 = parseFloat(cs2.paddingTop) + parseFloat(cs2.paddingBottom);
+    const h = Math.max(80, Math.round((strip.clientHeight - padY2) * 0.94));
     strip.style.setProperty("--po-h", h + "px");
   }
 
