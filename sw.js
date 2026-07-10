@@ -18,9 +18,10 @@
  */
 'use strict';
 
-const CACHE = 'bingkai-v12';
+importScripts('./version.js');
+const CACHE = self.CACHE_NAME; // single source: version.js
 const SHELL = [
-  './', './index.html', './css/app.css',
+  './', './index.html', './css/app.css', './version.js',
   './js/main.js', './js/carouselMode.js', './js/collageMode.js',
   './js/collageTemplates.js', './js/compositor.js', './js/config.js',
   './js/cropMode.js', './js/cropDebug.js', './js/exportModal.js', './js/exporter.js',

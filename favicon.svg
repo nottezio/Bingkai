@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="100%" height="100%" fill="none">
+  <!-- Background Style Layer (Optional container block to match retro style) -->
+  <rect width="32" height="32" rx="6" fill="#F4EBE1" stroke="#1A1A1A" stroke-width="2"/>
+  
+  <!-- Back Slide / Layer (Representing Collage/Carousel Sequence) -->
+  <rect x="5" y="11" width="16" height="16" rx="2" fill="#FFFFFF" stroke="#1A1A1A" stroke-width="2"/>
+  <!-- Aspect ratio line inside the back slide -->
+  <line x1="9" y1="15" x2="17" y2="15" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Front Active Slide / Frame (Representing the Selection/Editing action) -->
+  <rect x="11" y="5" width="16" height="16" rx="2" fill="#E06A4E" stroke="#1A1A1A" stroke-width="2"/>
+  <!-- Inner "Image Area" placeholder typical of editing/framing tools -->
+  <rect x="15" y="9" width="8" height="8" fill="#F4EBE1" stroke="#1A1A1A" stroke-width="1.5"/>
+</svg>
