@@ -22,6 +22,8 @@ importScripts('./version.js');
 const CACHE = self.CACHE_NAME; // single source: version.js
 const SHELL = [
   './', './index.html', './css/app.css', './version.js',
+  './manifest.json', './favicon.svg', './icon-192.png', './icon-512.png',
+  './icon-maskable-512.png', './apple-touch-180.png',
   './js/main.js', './js/carouselMode.js', './js/collageMode.js',
   './js/collageTemplates.js', './js/compositor.js', './js/config.js',
   './js/cropMode.js', './js/cropDebug.js', './js/exportModal.js', './js/exporter.js',

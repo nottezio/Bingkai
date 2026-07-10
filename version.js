@@ -8,6 +8,6 @@
  * Format: YYYY-MM-DD.N  (N = same-day build counter). Bump on every ship.
  */
 (function (g) {
-  g.APP_VERSION = "2026-07-10.1";
+  g.APP_VERSION = "2026-07-10.2";
   g.CACHE_NAME = "bingkai-" + g.APP_VERSION;
 })(typeof self !== "undefined" ? self : this);

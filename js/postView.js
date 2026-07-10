@@ -54,7 +54,14 @@ export const postView = (function () {
     // subtract the strip's own vertical padding so the card doesn't overflow it
     const cs = getComputedStyle(strip);
     const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-    const h = Math.max(80, Math.round(strip.clientHeight - padY));
+    // The slide-actions bar is position:absolute and overlays the bottom of the
+    // strip; subtract its height so the preview centres in the VISIBLE area
+    // (was overflowing under the bar with empty space at the top). The 0.92
+    // factor leaves symmetric breathing room, matching the reference apps.
+    const sa = document.getElementById("slideActions");
+    const saH = (sa && sa.classList.contains("show")) ? sa.getBoundingClientRect().height : 0;
+    const avail = strip.clientHeight - padY - saH;
+    const h = Math.max(80, Math.round(avail * 0.92));
     strip.style.setProperty("--po-h", h + "px");
   }
 

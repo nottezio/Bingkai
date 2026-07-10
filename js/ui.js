@@ -743,7 +743,17 @@ export const ui = (function () {
     collageMode.setOnCellImport(importIntoCell);
 
     document.querySelectorAll(".mode").forEach((b) =>
-      b.addEventListener("click", () => setMode(b.dataset.mode)));
+      b.addEventListener("click", () => {
+        // If this tool is already active while editing (one-action-lock, other
+        // tabs hidden), tapping its icon toggles the adjustment sheet open/closed
+        // — same as the sheet handle. Otherwise switch to the tapped tool.
+        const editing = !!document.querySelector(".mode.mode-hidden");
+        if (editing && b.dataset.mode === state.mode) {
+          document.body.classList.toggle("sheets-collapsed");
+        } else {
+          setMode(b.dataset.mode);
+        }
+      }));
 
     bindFrameControls();
     bindCropControls();

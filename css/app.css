@@ -107,9 +107,9 @@
     border-top: var(--bd) solid var(--line); border-bottom: var(--bd) solid var(--line);
   }
   .marquee-track {
-    display: inline-block; padding-left: 100%;
+    display: inline-block; padding-left: 14px;
     font-family: var(--font-mono); font-size: 11px; font-weight: bold; letter-spacing: .04em;
-    color: var(--txt); animation: marquee-scroll 18s linear infinite;
+    color: var(--txt); animation: none; padding-left: 0;
   }
   .marquee:hover .marquee-track { animation-play-state: paused; }
   @keyframes marquee-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
@@ -277,11 +277,13 @@
 
   .slide-context {
     display: flex; gap: 8px; padding: 6px 14px; font-family: var(--font-mono); font-size: 11px;
-    background: #000; color: #00FF00; text-transform: uppercase; letter-spacing: .04em;
+    background: var(--panel); color: var(--txt); text-transform: uppercase; letter-spacing: .04em;
+    border-bottom: var(--bd) solid var(--line);
   }
   .slide-context.hidden { display: none; }
   .sc-pos { font-weight: bold; }
-  .sc-type { opacity: .8; }
+  .sc-type { opacity: .85; }
+  .slide-context svg { stroke: var(--txt); }
 
   .sheet { background: var(--panel); border: 2px solid; border-color: var(--bevel-sh) var(--bevel-hi) var(--bevel-hi) var(--bevel-sh); padding: 12px; }
   .sheet.hidden { display: none; }
